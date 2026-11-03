@@ -24,7 +24,7 @@
 /* ============================================================
    小鹿 · 单文件应用
    视觉沿用「处方笺档案」：暖纸、宋体正文、黑体标题、等宽数字、一个印泥红。
-   结构：登录闸 → 首页 → 我的 → 工作台（单页切换，不跳转）
+   结构：登录闸 → 首页 → 记录 / 询问 / 识药 / 我的（单页切换，不跳转）
    ============================================================ */
 
 /* ————————————————— 1. 令牌 ————————————————— */
@@ -379,7 +379,8 @@ body[data-view="mine"] .appbar{border-bottom-color:var(--rule)}
 }
 
 .btn--rec{min-height:38px;padding:0 14px;gap:7px;font-size:12px;display:none}
-body[data-view="work"] .btn--rec{display:inline-flex}
+body[data-view="work"] .btn--rec,
+body[data-view="ask"] .btn--rec{display:inline-flex}
 .rec-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
 .btn--rec.is-live{background:var(--accent);border-color:var(--accent);color:var(--paper-2)}
 .btn--rec.is-live .rec-dot{background:var(--paper-2);animation:recPulse 1.4s var(--ease-in-out) infinite}
@@ -433,9 +434,9 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 .home__facts .dot{color:var(--rule-strong);margin:0 6px}
 
 .start-btn{
-  position:relative;width:100%;min-height:clamp(132px,17vh,168px);
+  position:relative;width:100%;min-height:clamp(124px,16vh,158px);
   display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;
-  padding:0 clamp(24px,4vw,42px);
+  padding:0 clamp(18px,3vw,32px);
   background:var(--ink);color:var(--paper-2);
   border:1px solid var(--ink);border-radius:1px;
   cursor:pointer;text-align:left;overflow:hidden;
@@ -446,11 +447,36 @@ body[data-view="work"] .btn--rec{display:inline-flex}
   font-family:var(--font-display);font-size:30px;line-height:1;
   transform:translateY(-50%);opacity:.42;transition:transform var(--dur-base) var(--ease-out),opacity var(--dur-base);
 }
-.start-btn__k{font-family:var(--font-display);font-weight:800;font-size:clamp(44px,7vw,66px);line-height:1;letter-spacing:-.03em}
-.start-btn__hint{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;color:var(--on-ink-dim)}
+.start-btn__k{font-family:var(--font-display);font-weight:800;font-size:clamp(32px,4.8vw,52px);line-height:1;letter-spacing:-.03em}
+.start-btn__hint{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;line-height:1.5;color:var(--on-ink-dim)}
 .start-btn:hover{background:var(--accent);border-color:var(--accent)}
 .start-btn:hover::after{transform:translate(6px,-50%);opacity:1}
 .start-btn:active{transform:translateY(1px)}
+
+/* 首页主入口：左「记录」右「询问」，两个入口分开，不再混在一个按钮里 */
+.start-split{display:grid;grid-template-columns:1.12fr 1fr;gap:12px}
+.start-ask{
+  position:relative;width:100%;min-height:clamp(124px,16vh,158px);
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;
+  padding:0 clamp(18px,3vw,32px);
+  background:transparent;color:var(--ink);
+  border:1px solid var(--rule-strong);border-radius:1px;
+  cursor:pointer;text-align:left;overflow:hidden;
+  transition:background var(--dur-base) var(--ease-out),color var(--dur-base) var(--ease-out),border-color var(--dur-base) var(--ease-out);
+}
+.start-ask::after{
+  content:"→";position:absolute;right:clamp(16px,3vw,28px);top:50%;
+  font-family:var(--font-display);font-size:26px;line-height:1;
+  transform:translateY(-50%);opacity:.28;
+  transition:transform var(--dur-base) var(--ease-out),opacity var(--dur-base);
+}
+.start-ask__k{font-family:var(--font-display);font-weight:800;font-size:clamp(32px,4.8vw,52px);line-height:1;letter-spacing:-.03em}
+.start-ask__hint{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;line-height:1.5;color:var(--muted)}
+.start-ask:hover{background:var(--ink);color:var(--paper-2);border-color:var(--ink)}
+.start-ask:hover .start-ask__hint{color:var(--on-ink-dim)}
+.start-ask:hover::after{transform:translate(5px,-50%);opacity:1}
+.start-ask:active{transform:translateY(1px)}
+.start-ask:focus-visible,.start-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .home__row{display:flex;gap:12px;margin-top:12px}
 .home__side{
@@ -536,12 +562,34 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 }
 .blank b{display:block;font-family:var(--font-display);font-size:14px;color:var(--ink-2);margin-bottom:6px}
 
-/* ————————————————— 9. 工作台 ————————————————— */
-.view--work{grid-template-columns:296px minmax(0,1fr) 336px;height:calc(100dvh - 58px);min-height:0;overflow:hidden}
+/* ————————————————— 9. 记录（原工作台，对话已拆到「询问」） ————————————————— */
+.view--work{grid-template-columns:minmax(0,860px) 336px;justify-content:center;height:calc(100dvh - 58px);min-height:0;overflow:hidden}
+.view--work .col--left{border-right:0}
 .col{min-height:0;min-width:0;overflow-y:auto}
 .col--left{border-right:1px solid var(--rule-strong);display:flex;flex-direction:column;padding-bottom:12px;background:var(--paper)}
 .col--mid{display:grid;grid-template-rows:minmax(0,1fr) auto;background:var(--paper);min-width:0}
 .col--right{border-left:1px solid var(--rule-strong);background:var(--paper-2);padding-bottom:24px}
+
+/* ——— 询问：独立对话页 ——— */
+.view--ask{display:none;flex-direction:column;height:calc(100dvh - 58px);min-height:0;overflow:hidden;background:var(--paper)}
+body[data-view="ask"] .view--ask{display:flex}
+body[data-view="ask"]{overflow:hidden}
+body[data-view="ask"] #app{height:100dvh}
+.ask-head{display:flex;align-items:center;gap:14px;padding:10px 20px;border-bottom:1px solid var(--rule-strong);background:var(--paper);flex:none}
+.ask-head__back{
+  appearance:none;border:1px solid var(--rule-strong);border-radius:var(--r-pill);background:transparent;
+  font-family:var(--font-body);font-size:12px;color:var(--ink-2);cursor:pointer;min-height:32px;padding:5px 12px;
+  display:inline-flex;align-items:center;gap:5px;flex:none;
+  transition:background var(--dur-fast),color var(--dur-fast),border-color var(--dur-fast);
+}
+.ask-head__back:hover{background:var(--ink);color:var(--paper-2);border-color:var(--ink)}
+.ask-head__back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ask-head__now{display:grid;gap:2px;min-width:0}
+.ask-head__ttl{font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--ink);letter-spacing:.01em;line-height:1.2}
+.ask-head__sub{font-size:11px;color:var(--muted);line-height:1.4}
+.view--ask .col--mid{border:0;flex:1;min-height:0;overflow:hidden;grid-template-rows:minmax(0,1fr) auto}
+.view--ask .thread{padding:26px max(22px,calc((100% - 820px)/2)) 16px}
+.view--ask .composer{padding:12px max(22px,calc((100% - 820px)/2)) 16px}
 .col__head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 10px}
 .col__head .meta{letter-spacing:.1em}
 
@@ -852,20 +900,25 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 
 /* ————————————————— 11. 窄屏 ————————————————— */
 @media (max-width:1180px){
-  .view--work{grid-template-columns:264px minmax(0,1fr) 306px}
+  .view--work{grid-template-columns:minmax(0,1fr) 306px}
   .voice__range{width:54px}
 }
 @media (max-width:980px){
   body[data-view="work"]{overflow:auto}
   body[data-view="work"] #app{height:auto}
   .view--work{grid-template-columns:minmax(0,1fr);height:auto;overflow:visible}
-  /* 手机首屏先给「录音 / 手动整理」，不再先铺一屏聊天 */
+  /* 手机顺序：录音与整理 → 本次记录 → 用药与概览 */
   .col--left{order:1;border-right:0;border-top:1px solid var(--rule-strong)}
-  .col--mid{order:2;min-height:62dvh;border-top:1px solid var(--rule-strong)}
-  .col--right{order:3;border-left:0;border-top:1px solid var(--rule-strong)}
+  .col--right{order:2;border-left:0;border-top:1px solid var(--rule-strong)}
   .col{overflow:visible}
   .thread{overflow:visible}
   .transcript{max-height:240px}
+  /* 询问页在手机上占满「顶栏以下、底部导航以上」，页面本身不滚动 */
+  .view--ask{height:calc(100dvh - 58px - 56px - env(safe-area-inset-bottom))}
+  .view--ask .col--mid{overflow:hidden}
+  .view--ask .thread{overflow-y:auto;padding:20px 16px 14px}
+  .view--ask .composer{padding:10px 14px 14px}
+  .ask-head{padding:8px 14px}
   .mine{grid-template-columns:minmax(0,1fr);border-left:0;border-right:0}
   .mine__side{border-right:0;border-bottom:1px solid var(--rule-strong)}
   .mine__main{padding:26px 20px 40px}
@@ -886,7 +939,11 @@ body[data-view="work"] .btn--rec{display:inline-flex}
   .home__clock{font-size:9.5px}
   .home__row{flex-direction:column}
   .home__side{min-height:72px}
-  .start-btn{min-height:120px}
+  .start-btn{min-height:112px}
+  .start-split{gap:10px;grid-template-columns:1fr 1fr}
+  .start-btn,.start-ask{min-height:112px;padding:0 14px}
+  .start-btn__k,.start-ask__k{font-size:clamp(28px,8.4vw,38px)}
+  .start-btn__hint,.start-ask__hint{font-size:9.5px;letter-spacing:.05em}
   .view--home{padding:24px 16px 40px}
   .composer{padding:10px 14px 14px}
   .thread{padding:22px 14px 16px}
@@ -920,6 +977,8 @@ body[data-view="work"] .btn--rec{display:inline-flex}
   .tabbar__btn.is-on::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:22px;height:2px;background:var(--accent);border-radius:0 0 2px 2px}
   /* 只有进入应用后才需要给底部导航让位；登录页不留这条空白 */
   body[data-view]{padding-bottom:calc(56px + env(safe-area-inset-bottom))}
+  /* 询问页自己已经扣掉了导航高度，不能再叠一层，否则会多出 56px 空白 */
+  body[data-view="ask"]{padding-bottom:0}
 
   .mfilter{grid-template-columns:minmax(0,1fr) auto auto}
   .mfilter__q{grid-column:1/-1}
@@ -935,7 +994,7 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 </head>
 <body>
 
-<a class="skip" href="#askInput">跳到输入</a>
+<a class="skip" href="#askInput" id="skipAsk">跳到询问</a>
 
 <!-- ——————————————— 登录闸 ——————————————— -->
 <div class="gate" id="gate">
@@ -978,12 +1037,12 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 
   <header class="appbar">
     <div class="appbar__left">
-      <button class="appbar__brand" type="button" data-go="home">小鹿 <i>/</i></button>
+      <button class="appbar__brand" type="button" data-go="home" title="回到首页" aria-label="回到首页">小鹿 <i>/</i></button>
       <span class="cloudbadge" id="cloudBadge" hidden>本机模式</span>
       <span class="savebadge" id="saveState" hidden>保存中…</span>
       <nav class="appbar__nav" aria-label="主导航">
-        <button class="navbtn is-on" type="button" data-go="home">首页</button>
-        <button class="navbtn" type="button" data-go="work">工作台</button>
+        <button class="navbtn" type="button" data-go="work">记录</button>
+        <button class="navbtn" type="button" data-go="ask">询问</button>
         <button class="navbtn" type="button" data-go="scan">识药</button>
         <button class="navbtn" type="button" data-go="mine">我的</button>
       </nav>
@@ -1040,10 +1099,16 @@ body[data-view="work"] .btn--rec{display:inline-flex}
         </div>
       </div>
 
-      <button class="start-btn" id="startBtn" type="button">
-        <span class="start-btn__k">开始</span>
-        <span class="start-btn__hint">一键录音 · 边说边转写 · 说完归档</span>
-      </button>
+      <div class="start-split">
+        <button class="start-btn" id="startBtn" type="button">
+          <span class="start-btn__k">记录</span>
+          <span class="start-btn__hint">录音 · 粘贴 · 整理成病历</span>
+        </button>
+        <button class="start-ask" id="askNow" type="button">
+          <span class="start-ask__k">询问</span>
+          <span class="start-ask__hint">只按你的档案回答</span>
+        </button>
+      </div>
 
       <div class="home__row">
         <button class="home__side" type="button" data-go="mine">
@@ -1201,7 +1266,7 @@ body[data-view="work"] .btn--rec{display:inline-flex}
           <ol class="timeline" id="timeline"></ol>
           <div class="blank" id="emptyRecs">
             <b id="emptyTitle">还没有一份记录。</b>
-            <span id="emptyBody">回到首页点「开始」，把一次问诊录下来；或者进工作台，把一段对话贴进「手动整理」的输入框。每一条记录都只属于这个账号。</span>
+            <span id="emptyBody">回到首页点「记录」，把一次问诊录下来；或者把一段对话贴进记录页「手动整理」的输入框。每一条记录都只属于这个账号。</span>
           </div>
         </div>
       </div>
@@ -1278,8 +1343,8 @@ body[data-view="work"] .btn--rec{display:inline-flex}
     </div>
   </section>
 
-  <!-- ======== 工作台 ======== -->
-  <section class="view view--work" id="view-work" aria-label="工作台">
+  <!-- ======== 记录（原工作台：录音 / 粘贴 / 整理，不含对话） ======== -->
+  <section class="view view--work" id="view-work" aria-label="记录">
 
     <!-- 左：本次录音 / 本次记录 -->
     <aside class="col col--left" aria-label="本次录音">
@@ -1328,32 +1393,6 @@ body[data-view="work"] .btn--rec{display:inline-flex}
       </div>
     </aside>
 
-    <!-- 中：对话 -->
-    <main class="col col--mid" id="chat" aria-label="对话">
-      <div class="thread" id="thread" role="log" aria-live="polite"></div>
-
-      <div class="composer">
-        <div class="chips" id="chips">
-          <button class="chip" type="button">我上次看病是什么时候？</button>
-          <button class="chip" type="button">我今天要吃什么药？</button>
-          <button class="chip" type="button">什么时候复诊？</button>
-          <button class="chip" type="button">我一共看过几次？</button>
-          <button class="chip" type="button">你叫什么名字？</button>
-        </div>
-        <form class="composer__row" id="askForm">
-          <label class="sr-only" for="askInput">向小鹿提问</label>
-          <textarea class="composer__input" id="askInput" rows="1"
-                    placeholder="问小鹿：我上次看病是什么时候？" autocomplete="off"></textarea>
-          <button class="btn btn--primary composer__send" type="submit">
-            发送<span class="btn__key" aria-hidden="true">↵</span>
-          </button>
-        </form>
-        <p class="composer__note">
-          只按你的记录回答，没有的就说没有。<b>内容不构成诊疗建议。</b>
-        </p>
-      </div>
-    </main>
-
     <!-- 右：今日用药 / 档案概览 -->
     <aside class="col col--right" aria-label="最近一次医嘱用药与档案概览">
       <section class="panel">
@@ -1388,9 +1427,48 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 
   </section>
 
+  <!-- ======== 询问（独立对话页） ======== -->
+  <section class="view view--ask" id="view-ask" aria-label="询问">
+
+    <header class="ask-head">
+      <button class="ask-head__back" type="button" data-go="work">
+        <span aria-hidden="true">←</span> 记录
+      </button>
+      <div class="ask-head__now">
+        <span class="ask-head__ttl">询问小鹿</span>
+        <span class="ask-head__sub">只按你的档案回答，没有的就说没有</span>
+      </div>
+    </header>
+
+    <main class="col col--mid" id="chat" aria-label="对话">
+      <div class="thread" id="thread" role="log" aria-live="polite"></div>
+
+      <div class="composer">
+        <div class="chips" id="chips">
+          <button class="chip" type="button">我上次看病是什么时候？</button>
+          <button class="chip" type="button">我今天要吃什么药？</button>
+          <button class="chip" type="button">什么时候复诊？</button>
+          <button class="chip" type="button">我一共看过几次？</button>
+          <button class="chip" type="button">你叫什么名字？</button>
+        </div>
+        <form class="composer__row" id="askForm">
+          <label class="sr-only" for="askInput">向小鹿提问</label>
+          <textarea class="composer__input" id="askInput" rows="1"
+                    placeholder="问小鹿：我上次看病是什么时候？" autocomplete="off"></textarea>
+          <button class="btn btn--primary composer__send" type="submit">
+            发送<span class="btn__key" aria-hidden="true">↵</span>
+          </button>
+        </form>
+        <p class="composer__note">
+          只按你的记录回答，没有的就说没有。<b>内容不构成诊疗建议。</b>
+        </p>
+      </div>
+    </main>
+  </section>
+
   <nav class="tabbar" id="tabbar" aria-label="底部导航">
-    <button class="tabbar__btn is-on" type="button" data-go="home">首页</button>
-    <button class="tabbar__btn" type="button" data-go="work">工作台</button>
+    <button class="tabbar__btn" type="button" data-go="work">记录</button>
+    <button class="tabbar__btn" type="button" data-go="ask">询问</button>
     <button class="tabbar__btn" type="button" data-go="scan">识药</button>
     <button class="tabbar__btn" type="button" data-go="mine">我的</button>
   </nav>
@@ -2319,6 +2397,7 @@ body[data-view="work"] .btn--rec{display:inline-flex}
     if (view === 'home') renderHome();
     if (view === 'mine') renderMine();
     if (view === 'work') renderWork();
+    if (view === 'ask') renderAsk();
     if (view === 'scan') renderScan();
     window.scrollTo(0, 0);
   }
@@ -2345,7 +2424,7 @@ body[data-view="work"] .btn--rec{display:inline-flex}
       if (a === 'edit') { openEditDialog(act.getAttribute('data-id')); }
       if (a === 'reuse') {
         if (!state.draft) return;
-        go('work');
+        go('ask');
         var input = $('#askInput');
         input.value = state.draft.transcript;
         autoGrow();
@@ -3253,7 +3332,7 @@ body[data-view="work"] .btn--rec{display:inline-flex}
         if (eb) {
           eb.textContent = filtering
             ? '换个关键词，或点「清空」看全部档案。'
-            : '回到首页点「开始」，把一次问诊录下来；或者进工作台，把一段对话贴进「手动整理」的输入框。每一条记录都只属于这个账号。';
+            : '回到首页点「记录」，把一次问诊录下来；或者把一段对话贴进记录页「手动整理」的输入框。每一条记录都只属于这个账号。';
         }
       }
       var fc0 = $('#recFilterCount');
@@ -3380,7 +3459,7 @@ body[data-view="work"] .btn--rec{display:inline-flex}
   }
 
   /* ============================================================
-     8. 工作台渲染
+     8. 记录 / 询问渲染
      ============================================================ */
   function renderWork() {
     syncIdentity();
@@ -3389,7 +3468,13 @@ body[data-view="work"] .btn--rec{display:inline-flex}
     renderOverview();
     renderRx();
     renderRecordPanel();
+  }
+
+  /* 询问是独立视图：首次进入放问候语，之后回来保留原来的对话 */
+  function renderAsk() {
+    syncIdentity();
     if (!state.chatReady) { state.chatReady = true; greet(); }
+    scrollThread();
   }
 
   function renderOverview() {
@@ -3583,8 +3668,19 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 
   function bindWorkbench() {
     $('#startBtn').addEventListener('click', function () {
-      /* 先弹同意提示，确认后再进工作台（不自动开麦） */
+      /* 先弹同意提示，确认后再进「记录」（不自动开麦） */
       showConsentModal(function () { go('work'); });
+    });
+
+    /* 首页右侧「询问」：直接进对话页；不涉及录音，所以不弹同意提示 */
+    $('#askNow').addEventListener('click', function () { go('ask'); });
+
+    /* 键盘用户的跳转链接：先切到询问页，再把焦点放进输入框 */
+    var skip = $('#skipAsk');
+    if (skip) skip.addEventListener('click', function (e) {
+      e.preventDefault();
+      go('ask');
+      setTimeout(function () { var i = $('#askInput'); if (i) i.focus(); }, 30);
     });
 
     $('#recBtn').addEventListener('click', function () {
@@ -3751,6 +3847,8 @@ body[data-view="work"] .btn--rec{display:inline-flex}
   }
 
   function startRec() {
+    /* 录音属于「记录」模块：从询问页点录音先回到记录页，否则转写落在看不见的地方 */
+    if (state.view !== 'work') go('work');
     if (!SR) {
       toast('这个浏览器不支持语音识别。用「手动整理」贴文字，一样能存成记录。');
       $('#manualText').focus();
@@ -4251,7 +4349,7 @@ body[data-view="work"] .btn--rec{display:inline-flex}
   var extractSeq = 0;
 
   function buildDraft(text, mode, segCount) {
-    /* 从别处触发时先回工作台，弹窗背后必须是这一摊东西 */
+    /* 从别处触发时先回记录页，弹窗背后必须是这一摊东西 */
     if (state.view !== 'work') go('work');
 
     var seq = ++extractSeq;
@@ -4725,8 +4823,8 @@ body[data-view="work"] .btn--rec{display:inline-flex}
     addBot([
       { h: '我在。我是小鹿——只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。',
         t: '我在。我是小鹿，只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。' },
-      { h: '想开始，就点右上「开始录音」；也可以按「手动整理」贴一段问诊内容。看不清药盒，就去首页「拍照识药」拍一张。想先试试我，问我「你叫什么名字」。',
-        t: '想开始，就点右上开始录音；也可以按手动整理贴一段问诊内容。看不清药盒，就去首页拍照识药拍一张。' }
+      { h: '想记录，去「记录」页点右上「开始录音」，或把问诊内容贴进「手动整理」。想问档案里的旧事，就在这一页直接问。看不清药盒，去「识药」拍一张。',
+        t: '想记录，去记录页点右上开始录音，或把问诊内容贴进手动整理。想问档案里的旧事，就在这一页直接问。看不清药盒，去识药拍一张。' }
     ], [], false);
   }
 
