@@ -42,6 +42,8 @@
 │   ├── .env.example
 │   └── README.md
 ├── xiaoxiao-medrec/          # 可安装的 WorkBuddy Skill
+├── ARCHITECTURE.md           # 架构：模块、数据流、接口、关键取舍
+├── CONTRIBUTING.md           # 协作规则：分支、提交、测试、安全红线
 ├── 小鹿Agent严格复审整改说明.md
 ├── 小鹿Agent双视角测试评估.md
 └── 小鹿Agent资料同步与模型接入.md
@@ -142,10 +144,17 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
 
 ## 一起开发
 
+先看两份文档：
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md)：系统由什么组成、数据怎么流、接口有哪些、为什么这么选
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)：分支与提交规范、测试要求、数据库变更、安全红线、PR 清单
+
+最短路径：
+
 1. 从 `main` 切功能分支：`git checkout -b feat/your-feature`
 2. 提交前确认 `git status` 里没有 `.env`、`config.env`、`*.key`、`data/`
-3. 开 Pull Request，描述改了什么、怎么验证
-4. 后端改动请补 `pytest`；前端改动请至少在 390px 与桌面各走一遍主流程
+3. 开 Pull Request，写清改了什么、怎么验证
+4. 后端改动补 `pytest`；前端改动至少在 390px 与桌面各走一遍主流程
 
 ### 已知待办
 
