@@ -741,7 +741,7 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 .consent-modal__sub{margin:7px 0 0;font-size:10.5px;line-height:1.6;color:var(--muted)}
 .consent-modal__acts{display:flex;gap:9px}
 .consent-modal__acts .btn{flex:1}
-@media (max-width:390px){
+@media (max-width:480px){
   .consent-modal__card{padding:20px 16px 16px;border-radius:24px}
   .consent-modal__deer{font-size:40px}
   .consent-modal__txt{font-size:14px}
@@ -5411,7 +5411,19 @@ body[data-view="work"] .btn--rec{display:inline-flex}
     }
     modal.classList.add('is-on');
     clearTimeout(consentTimer);
-    consentTimer = setTimeout(close, 2000);
+    /* 超时也继续进入后续流程：否则用户点了「开始」，弹窗自己消失却停在首页 */
+    consentTimer = setTimeout(function () {
+      close();
+      if (typeof onConfirm === 'function') onConfirm();
+    }, 2000);
+
+    /* 键盘与读屏：焦点进弹窗，Esc 关闭 */
+    var yes = $('#consentYes');
+    if (yes && yes.focus) setTimeout(function () { yes.focus(); }, 30);
+    modal.onkeydown = function (e) {
+      if (e && e.key === 'Escape') close();
+    };
+
     /* 点遮罩（卡片之外）立即消失 */
     modal.onclick = function (e) {
       if (e.target === modal) close();
