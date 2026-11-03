@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.agent.extractor import extract
+from app.agent.refine import refine_extract
 from app.api.deps import current_user, rate_limit
 from app.db import repo
 from app.db.models import Record, User
@@ -99,7 +100,12 @@ def delete_record(
 
 @router.post("/extract", response_model=ExtractOut,
              dependencies=[Depends(rate_limit("records:extract", 60))])
-def extract_fields(body: ExtractIn, user: User = Depends(current_user)) -> ExtractOut:
-    """把一段转写抽成结构化字段。不落库——用户确认后才 POST /api/records。"""
+async def extract_fields(body: ExtractIn, user: User = Depends(current_user)) -> ExtractOut:
+    """把一段转写抽成结构化字段。不落库——用户确认后才 POST /api/records。
+
+    规则先抽一遍（谁、哪几个药），再让模型校对药名与用法；
+    模型输出必须能在原文里找到依据，找不到就保留规则值。
+    """
     result = extract(body.text)
+    result = await refine_extract(body.text, result, user.id)
     return ExtractOut(**result)

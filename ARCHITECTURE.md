@@ -75,6 +75,7 @@ flowchart LR
 | `state.records` | 当前账号档案 |
 | `state.aiOn` | 服务端模型是否可用，由 `/api/ai/status` 决定 |
 | `state.saving` | 归档/修改进行中，期间禁止导出 |
+| `state.calPending` | 刚结束一次录音，归档弹窗关闭后弹「放进日历」 |
 
 ### API 层
 
@@ -85,6 +86,12 @@ flowchart LR
 - 统一把后端 `detail` 转成 Error
 
 ---
+
+### 主题与提醒
+
+- 主题：`html[data-theme]` 四套（浅白默认 / 暖纸 / 樱粉 / 暗夜），只覆盖颜色令牌，版式不动；弹窗、小鹿插画都用 `--accent` / `--paper-2` 跟随主题。
+- 录音结束：归档弹窗关闭后弹小鹿弹窗，把复诊（`follow_up` 解析「两周后」「10月20日」）和用药（药名/剂量/频次/天数）写成 `.ics` 日程，含 `RRULE` 与 `VALARM`；只生成文件，由用户在系统日历里确认导入。
+- 提醒设置（用药时间、是否自动生成）按账号存在 `lx_cal_v1_<账号>`。
 
 ## 3. 后端分层
 
@@ -135,6 +142,7 @@ sequenceDiagram
 
 关键规则：
 
+- 抽取接口先跑规则（谁、哪几个药），再用模型校对药名/剂量；模型的每个字段都要能在原文找到依据，药品数量顺序不一致就整次放弃（`app/agent/refine.py`）。
 - 抽取没回来之前，保存按钮禁用。
 - 用户手工改过的字段，迟到的抽取结果不能覆盖。
 - 抽取失败转全手工，不套用本机旧规则。
@@ -201,6 +209,7 @@ flowchart TD
 | GET | `/api/ai/status` | 模型是否可用、模型名 |
 | POST | `/api/ai/chat` | 文本模型代理 |
 | POST | `/api/ai/vision` | 识图代理 |
+| POST | `/api/ai/asr` | 语音转写：data URL 音频 → 文字（qwen omni，单次 ≤ 约 9MB） |
 | GET | `/healthz` `/readyz` | 存活 / 就绪 |
 
 鉴权统一用 `X-Xiaolu-Token`。

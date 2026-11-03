@@ -77,6 +77,8 @@ class Settings(BaseSettings):
     # —— ASR ——
     asr_provider: str = "none"           # none | openai
     asr_model: str = "whisper-1"
+    # 语音转写走「能听音频的对话模型」：和文本模型共用 base_url / key
+    asr_chat_model: str = "qwen3.8-omni-flash"
 
     # —— 任务 ——
     job_poll_interval: float = 1.0

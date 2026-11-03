@@ -13,10 +13,10 @@
     var raw = localStorage.getItem('lx_theme_guest_v1') || '';
     var t = raw;
     try { t = JSON.parse(raw); } catch (e) { t = raw; }
-    if (t !== 'warm' && t !== 'dark' && t !== 'light') t = 'warm';
+    if (t !== 'warm' && t !== 'dark' && t !== 'light' && t !== 'sakura') t = 'light';
     document.documentElement.setAttribute('data-theme', t);
   } catch (e) {
-    document.documentElement.setAttribute('data-theme', 'warm');
+    document.documentElement.setAttribute('data-theme', 'light');
   }
 })();
 </script>
@@ -42,6 +42,9 @@
   --accent:#a6341f;
   --accent-ink:#7d2415;
   --accent-wash:#f3ded6;
+  --danger:#a6341f;
+  --danger-line:rgba(166,52,31,.42);
+  --danger-wash:rgba(166,52,31,.08);
   --green:#2e5d4b;
   --green-wash:#e2ebe4;
   --amber:#8a5a12;
@@ -69,8 +72,8 @@
   --dur-fast:160ms; --dur-base:320ms;
 
   /* 反相文本（压在深底上的浅字）与纸纹混合，主题切换要跟着变 */
-  --on-ink-dim:var(--on-ink-dim);
-  --on-ink-dim-2:var(--on-ink-dim-2);
+  --on-ink-dim:rgba(251,247,238,.68);
+  --on-ink-dim-2:rgba(251,247,238,.62);
   --grain-opacity:.4;
   --grain-blend:multiply;
 }
@@ -92,6 +95,9 @@ html[data-theme="dark"]{
   --accent:#d97862;
   --accent-ink:#eda48f;
   --accent-wash:#33231d;
+  --danger:#ff9b8c;
+  --danger-line:rgba(255,155,140,.42);
+  --danger-wash:rgba(255,155,140,.14);
   --green:#8bc0a6;
   --green-wash:#1d2b24;
   --amber:#d8a964;
@@ -121,6 +127,9 @@ html[data-theme="light"]{
   --accent:#0f6e63;
   --accent-ink:#0a534b;
   --accent-wash:#e2f0ee;
+  --danger:#b3261e;
+  --danger-line:rgba(179,38,30,.38);
+  --danger-wash:rgba(179,38,30,.07);
   --green:#2b6c4e;
   --green-wash:#e3f0e9;
   --amber:#8a6414;
@@ -130,6 +139,35 @@ html[data-theme="light"]{
   --on-ink-dim:rgba(245,247,246,.66);
   --on-ink-dim-2:rgba(245,247,246,.62);
   --grain-opacity:.16;
+  --grain-blend:multiply;
+  color-scheme:light;
+}
+html[data-theme="sakura"]{
+  --paper:#fbf3f2;
+  --paper-2:#fffaf9;
+  --paper-3:#f4e4e5;
+  --ink:#2a1a1c;
+  --ink-2:#55403f;
+  --muted:#8a6f6e;
+  --rule:rgba(42,26,28,.13);
+  --rule-strong:rgba(42,26,28,.28);
+  --ink-rgb:42,26,28;
+
+  --accent:#c2506e;
+  --accent-ink:#9d3552;
+  --accent-wash:#fae2e9;
+  --danger:#b83b5b;
+  --danger-line:rgba(184,59,91,.4);
+  --danger-wash:rgba(184,59,91,.08);
+  --green:#4a6f5c;
+  --green-wash:#e7efe9;
+  --amber:#8a5a12;
+  --amber-wash:#f6ebd8;
+  --amber-ink:#5b3a0c;
+
+  --on-ink-dim:rgba(255,250,249,.7);
+  --on-ink-dim-2:rgba(255,250,249,.64);
+  --grain-opacity:.2;
   --grain-blend:multiply;
   color-scheme:light;
 }
@@ -433,54 +471,32 @@ body[data-view="ask"] .btn--rec{display:inline-flex}
 .home__facts{font-size:13px;color:var(--ink-2);line-height:1.7}
 .home__facts .dot{color:var(--rule-strong);margin:0 6px}
 
-.start-btn{
-  position:relative;width:100%;min-height:clamp(124px,16vh,158px);
-  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;
-  padding:0 clamp(18px,3vw,32px);
+/* 首页四宫格：记录 / 询问 同色同高，我的 / 拍照识药 同宽对齐 */
+.home__grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.start-card{
+  position:relative;width:100%;min-height:clamp(150px,19vh,186px);
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:6px;
+  padding:16px clamp(16px,2.6vw,26px) 18px;
   background:var(--ink);color:var(--paper-2);
   border:1px solid var(--ink);border-radius:1px;
   cursor:pointer;text-align:left;overflow:hidden;
-  transition:background var(--dur-base) var(--ease-out),border-color var(--dur-base) var(--ease-out);
+  transition:background var(--dur-base) var(--ease-out),border-color var(--dur-base) var(--ease-out),transform var(--dur-fast);
 }
-.start-btn::after{
-  content:"→";position:absolute;right:clamp(22px,4vw,38px);top:50%;
-  font-family:var(--font-display);font-size:30px;line-height:1;
-  transform:translateY(-50%);opacity:.42;transition:transform var(--dur-base) var(--ease-out),opacity var(--dur-base);
+.start-card::after{
+  content:"→";position:absolute;right:clamp(14px,2.4vw,24px);top:15px;
+  font-family:var(--font-mono);font-size:15px;line-height:1;
+  opacity:.5;transition:transform var(--dur-base) var(--ease-out),opacity var(--dur-base);
 }
-.start-btn__k{font-family:var(--font-display);font-weight:800;font-size:clamp(32px,4.8vw,52px);line-height:1;letter-spacing:-.03em}
-.start-btn__hint{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;line-height:1.5;color:var(--on-ink-dim)}
-.start-btn:hover{background:var(--accent);border-color:var(--accent)}
-.start-btn:hover::after{transform:translate(6px,-50%);opacity:1}
-.start-btn:active{transform:translateY(1px)}
+.start-card__tag{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;color:var(--on-ink-dim);text-transform:uppercase}
+.start-card__k{font-family:var(--font-display);font-weight:800;font-size:clamp(38px,5.2vw,58px);line-height:1;letter-spacing:-.03em}
+.start-card__hint{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;line-height:1.5;color:var(--on-ink-dim)}
+.start-card:hover{background:var(--accent);border-color:var(--accent)}
+.start-card:hover::after{transform:translate(4px,0);opacity:1}
+.start-card:active{transform:translateY(1px)}
+.start-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-/* 首页主入口：左「记录」右「询问」，两个入口分开，不再混在一个按钮里 */
-.start-split{display:grid;grid-template-columns:1.12fr 1fr;gap:12px}
-.start-ask{
-  position:relative;width:100%;min-height:clamp(124px,16vh,158px);
-  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;
-  padding:0 clamp(18px,3vw,32px);
-  background:transparent;color:var(--ink);
-  border:1px solid var(--rule-strong);border-radius:1px;
-  cursor:pointer;text-align:left;overflow:hidden;
-  transition:background var(--dur-base) var(--ease-out),color var(--dur-base) var(--ease-out),border-color var(--dur-base) var(--ease-out);
-}
-.start-ask::after{
-  content:"→";position:absolute;right:clamp(16px,3vw,28px);top:50%;
-  font-family:var(--font-display);font-size:26px;line-height:1;
-  transform:translateY(-50%);opacity:.28;
-  transition:transform var(--dur-base) var(--ease-out),opacity var(--dur-base);
-}
-.start-ask__k{font-family:var(--font-display);font-weight:800;font-size:clamp(32px,4.8vw,52px);line-height:1;letter-spacing:-.03em}
-.start-ask__hint{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;line-height:1.5;color:var(--muted)}
-.start-ask:hover{background:var(--ink);color:var(--paper-2);border-color:var(--ink)}
-.start-ask:hover .start-ask__hint{color:var(--on-ink-dim)}
-.start-ask:hover::after{transform:translate(5px,-50%);opacity:1}
-.start-ask:active{transform:translateY(1px)}
-.start-ask:focus-visible,.start-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-.home__row{display:flex;gap:12px;margin-top:12px}
 .home__side{
-  position:relative;flex:1 1 0;min-width:0;min-height:86px;
+  position:relative;width:100%;min-width:0;min-height:88px;
   display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;
   padding:0 clamp(16px,3vw,26px);
   background:transparent;border:1px solid var(--rule-strong);border-radius:1px;
@@ -554,8 +570,16 @@ body[data-view="ask"] .btn--rec{display:inline-flex}
 .tl__acts{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .tl__acts-r{display:flex;align-items:center;gap:14px}
 .tl__label{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
-.del{background:none;border:0;padding:4px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:var(--muted);cursor:pointer;border-bottom:1px solid transparent}
-.del:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.del{
+  appearance:none;cursor:pointer;min-height:34px;padding:0 14px;border-radius:7px;
+  border:1px solid var(--danger-line);background:var(--danger-wash);color:var(--danger);
+  font-family:var(--font-body);font-size:12.5px;font-weight:700;letter-spacing:0;line-height:1;
+  transition:background var(--dur-fast),color var(--dur-fast),border-color var(--dur-fast),transform var(--dur-fast);
+}
+.del:hover,.del:focus-visible{background:var(--danger);border-color:var(--danger);color:#fff;outline:none}
+.del:active{transform:translateY(1px)}
+.del[data-act="del"]{background:var(--danger);border-color:var(--danger);color:#fff}
+.del[data-act="del"]:hover,.del[data-act="del"]:focus-visible{filter:brightness(.92)}
 .blank{
   margin-top:20px;padding:26px 22px;border:1px dashed var(--rule-strong);
   font-size:13px;line-height:1.85;color:var(--muted);background:var(--paper-2);
@@ -772,15 +796,17 @@ body[data-view="ask"] #app{height:100dvh}
 .consent-modal.is-on{opacity:1;pointer-events:auto}
 .consent-modal__card{
   position:relative;width:min(380px,calc(100% - 32px));
-  background:var(--amber-wash);border-radius:28px;padding:24px 22px 18px;text-align:center;
+  background:var(--paper-2);border:1px solid var(--rule-strong);
+  border-radius:28px;padding:24px 22px 18px;text-align:center;
   box-shadow:var(--shadow-3);
   transform:translateY(8px) scale(.98);transition:transform .28s var(--ease-out);
 }
 .consent-modal.is-on .consent-modal__card{transform:translateY(0) scale(1)}
-.consent-modal__deer{font-size:48px;line-height:1;margin-bottom:4px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.14))}
+.consent-modal__deer{width:86px;height:86px;margin:0 auto 2px;color:var(--accent);filter:drop-shadow(0 4px 8px rgba(0,0,0,.12))}
+.consent-modal__deer .deer-art,.deer-modal__art .deer-art{display:block;width:100%;height:100%}
 .consent-modal__panel{
-  margin:8px 0 16px;padding:13px 14px;border:1.5px dashed var(--amber);
-  border-radius:18px;background:var(--paper-2);
+  margin:8px 0 16px;padding:13px 14px;border:1.5px dashed var(--accent);
+  border-radius:18px;background:var(--accent-wash);
 }
 .consent-modal__txt{
   margin:0;font-family:var(--font-display);font-weight:700;
@@ -791,7 +817,7 @@ body[data-view="ask"] #app{height:100dvh}
 .consent-modal__acts .btn{flex:1}
 @media (max-width:480px){
   .consent-modal__card{padding:20px 16px 16px;border-radius:24px}
-  .consent-modal__deer{font-size:40px}
+  .consent-modal__deer{width:70px;height:70px}
   .consent-modal__txt{font-size:14px}
 }
 
@@ -898,6 +924,61 @@ body[data-view="ask"] #app{height:100dvh}
 
 .tabbar{display:none}
 
+/* ——— 询问：语音输入 ——— */
+.composer__mic{
+  flex:none;width:46px;height:46px;border-radius:50%;
+  border:1px solid var(--rule-strong);background:var(--paper-2);color:var(--ink-2);
+  display:grid;place-items:center;cursor:pointer;
+  transition:background var(--dur-fast),color var(--dur-fast),border-color var(--dur-fast),box-shadow var(--dur-fast);
+}
+.composer__mic:hover{color:var(--ink);border-color:var(--ink-2)}
+.composer__mic.is-live{background:var(--accent);border-color:var(--accent);color:var(--paper-2);animation:micPulse 1.4s infinite}
+.composer__mic.is-busy{opacity:.6;cursor:progress}
+.composer__mic:disabled{opacity:.5;cursor:not-allowed}
+@keyframes micPulse{
+  0%{box-shadow:0 0 0 0 rgba(var(--ink-rgb),.28)}
+  70%{box-shadow:0 0 0 10px rgba(var(--ink-rgb),0)}
+  100%{box-shadow:0 0 0 0 rgba(var(--ink-rgb),0)}
+}
+
+/* ——— 录音结束：小鹿与日历 ——— */
+.deer-modal{
+  position:fixed;inset:0;z-index:300;display:grid;place-items:center;padding:24px;
+  background:rgba(var(--ink-rgb),.52);opacity:0;pointer-events:none;
+  transition:opacity .2s var(--ease-out);
+}
+.deer-modal.is-on{opacity:1;pointer-events:auto}
+.deer-modal__card{
+  position:relative;width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 40px);overflow:auto;
+  background:var(--paper-2);border:1px solid var(--rule-strong);border-radius:26px;
+  padding:22px 22px 18px;box-shadow:var(--shadow-3);
+  transform:translateY(10px) scale(.98);transition:transform .28s var(--ease-out);
+}
+.deer-modal.is-on .deer-modal__card{transform:none}
+.deer-modal__art{width:84px;height:84px;margin:0 auto 4px;color:var(--accent)}
+.deer-modal__ttl{font-family:var(--font-display);font-size:18px;font-weight:800;text-align:center;letter-spacing:-.01em;line-height:1.35}
+.deer-modal__txt{margin:7px 0 12px;text-align:center;font-size:12.5px;line-height:1.75;color:var(--ink-2);max-width:none}
+.deer-modal__list{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px}
+.deer-modal__list li{
+  display:grid;gap:2px;padding:8px 10px;border-left:2px solid var(--accent);
+  background:var(--accent-wash);border-radius:1px;
+}
+.deer-modal__list b{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.5}
+.deer-modal__list span{font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.deer-modal__list li.is-empty{border-left-color:var(--rule-strong);background:transparent;color:var(--muted);font-size:12px}
+.deer-modal__acts{display:flex;gap:8px;flex-wrap:wrap}
+.deer-modal__acts .btn{flex:1 1 0;min-width:0;min-height:40px}
+.deer-modal__acts #calSet{flex:0 0 auto;padding:0 14px}
+.deer-modal__set{margin-top:12px;padding-top:12px;border-top:1px dashed var(--rule);display:grid;gap:9px}
+.deer-modal__set[hidden]{display:none}
+.deer-modal__row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-2)}
+.deer-modal__row select{
+  min-height:32px;padding:3px 8px;border:1px solid var(--rule-strong);border-radius:6px;
+  background:var(--paper-2);color:var(--ink);font-family:var(--font-mono);font-size:12px;
+}
+.deer-modal__row input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent)}
+.deer-modal__note{margin:0;font-size:10.5px;line-height:1.65;color:var(--muted);max-width:none}
+
 /* ————————————————— 11. 窄屏 ————————————————— */
 @media (max-width:1180px){
   .view--work{grid-template-columns:minmax(0,1fr) 306px}
@@ -939,13 +1020,20 @@ body[data-view="ask"] #app{height:100dvh}
   .home__clock{font-size:9.5px}
   .home__row{flex-direction:column}
   .home__side{min-height:72px}
-  .start-btn{min-height:112px}
-  .start-split{gap:10px;grid-template-columns:1fr 1fr}
-  .start-btn,.start-ask{min-height:112px;padding:0 14px}
-  .start-btn__k,.start-ask__k{font-size:clamp(28px,8.4vw,38px)}
-  .start-btn__hint,.start-ask__hint{font-size:9.5px;letter-spacing:.05em}
+  .home__grid{gap:10px}
+  .start-card{min-height:118px;padding:12px 14px 14px}
+  .start-card__k{font-size:clamp(30px,8.6vw,40px)}
+  .start-card__hint{font-size:9px;letter-spacing:.03em}
+  .start-card::after{top:11px;right:12px;font-size:13px}
+  .home__side{min-height:78px}
   .view--home{padding:24px 16px 40px}
   .composer{padding:10px 14px 14px}
+  .composer__mic{width:42px;height:42px}
+  .composer__input{font-size:14px}
+  .deer-modal{padding:16px}
+  .deer-modal__card{padding:18px 16px 14px;border-radius:22px}
+  .deer-modal__art{width:68px;height:68px}
+  .deer-modal__ttl{font-size:16px}
   .thread{padding:22px 14px 16px}
   .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px}
   .gate__card{padding:30px 22px 24px}
@@ -1059,9 +1147,10 @@ body[data-view="ask"] #app{height:100dvh}
       <label class="themepick" title="切换主题">
         <span class="themepick__dot" aria-hidden="true"></span>
         <select class="themepick__sel" id="themeSel" aria-label="主题">
-          <option value="warm">暖纸</option>
-          <option value="dark">暗夜</option>
           <option value="light">浅白</option>
+          <option value="warm">暖纸</option>
+          <option value="sakura">樱粉</option>
+          <option value="dark">暗夜</option>
         </select>
       </label>
 
@@ -1099,25 +1188,24 @@ body[data-view="ask"] #app{height:100dvh}
         </div>
       </div>
 
-      <div class="start-split">
-        <button class="start-btn" id="startBtn" type="button">
-          <span class="start-btn__k">记录</span>
-          <span class="start-btn__hint">录音 · 粘贴 · 整理成病历</span>
+      <div class="home__grid">
+        <button class="start-card" id="startBtn" type="button">
+          <span class="start-card__tag">REC · 录音整理</span>
+          <span class="start-card__k">记录</span>
+          <span class="start-card__hint">录下来 · 贴文字 · 整理成病历</span>
         </button>
-        <button class="start-ask" id="askNow" type="button">
-          <span class="start-ask__k">询问</span>
-          <span class="start-ask__hint">只按你的档案回答</span>
+        <button class="start-card" id="askNow" type="button">
+          <span class="start-card__tag">ASK · 档案问答</span>
+          <span class="start-card__k">询问</span>
+          <span class="start-card__hint">只按你的档案回答</span>
         </button>
-      </div>
-
-      <div class="home__row">
         <button class="home__side" type="button" data-go="mine">
           <span class="home__side-k">我的</span>
           <span class="meta" id="homeRecCount">0 份记录</span>
         </button>
         <button class="home__side" type="button" data-go="scan">
           <span class="home__side-k">拍照识药</span>
-          <span class="meta">药盒 · 处方 · 认完直接入库</span>
+          <span class="meta">药盒 · 处方 · 认完入库</span>
         </button>
       </div>
 
@@ -1281,10 +1369,9 @@ body[data-view="ask"] #app{height:100dvh}
       <aside class="scan__side">
         <div class="scan__head">
           <button class="link-arrow" type="button" data-go="home" style="font-size:11px">← 返回首页</button>
-          <span class="meta" id="scanEngine">本机识别</span>
         </div>
         <h2 class="scan__ttl">拍照识药</h2>
-        <p class="scan__lede">药盒、处方、病历单都行。图片先在本地预览；启用千问后，识别时会把这张图发给千问。</p>
+        <p class="scan__lede">药盒、处方、病历单都行。图片会先发给识别服务读出药名与用法，结果可以逐项改，确认后才进档案。</p>
 
         <div class="shot" id="shotBox">
           <div class="shot__empty" id="shotEmpty">
@@ -1303,14 +1390,6 @@ body[data-view="ask"] #app{height:100dvh}
         </div>
 
         <p class="scan__status" id="scanStatus">选一张图，识别药名、剂量、频次与饭前饭后。</p>
-
-        <div class="scan__engine">
-          <div class="scan__engine-hd">
-            <span class="meta">识别引擎</span>
-            <span class="tag" id="aiEngineTag">服务端接入</span>
-          </div>
-          <p class="scan__hint" id="aiHint">未接入千问：本机没有 OCR，只能手动录入。</p>
-        </div>
 
         <div class="scan__hist">
           <div class="scan__hist-hd">
@@ -1452,9 +1531,18 @@ body[data-view="ask"] #app{height:100dvh}
           <button class="chip" type="button">你叫什么名字？</button>
         </div>
         <form class="composer__row" id="askForm">
+          <button class="composer__mic" id="askMic" type="button"
+                  aria-label="语音输入问题" aria-pressed="false" title="点一下开始说，再点一下结束">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"
+                 stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+              <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+              <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"></path>
+              <path d="M12 18v3"></path>
+            </svg>
+          </button>
           <label class="sr-only" for="askInput">向小鹿提问</label>
           <textarea class="composer__input" id="askInput" rows="1"
-                    placeholder="问小鹿：我上次看病是什么时候？" autocomplete="off"></textarea>
+                    placeholder="问小鹿：上次看病是什么时候？" autocomplete="off"></textarea>
           <button class="btn btn--primary composer__send" type="submit">
             发送<span class="btn__key" aria-hidden="true">↵</span>
           </button>
@@ -1536,13 +1624,74 @@ body[data-view="ask"] #app{height:100dvh}
 <!-- ——————————————— 录音前同意提示（模态弹窗） ——————————————— -->
 <div class="consent-modal" id="consentModal" role="dialog" aria-modal="true" aria-labelledby="consentTxt">
   <div class="consent-modal__card">
-    <div class="consent-modal__deer" aria-hidden="true">🦌</div>
+    <div class="consent-modal__deer" aria-hidden="true"><svg class="deer-art" viewBox="0 0 120 120" aria-hidden="true">
+  <g fill="none" stroke="var(--accent)" stroke-width="3.2" stroke-linecap="round">
+    <path d="M44 40c-6-6-8-12-6-20"></path><path d="M40 31c-6-1-10-4-12-8"></path>
+    <path d="M76 40c6-6 8-12 6-20"></path><path d="M80 31c6-1 10-4 12-8"></path>
+  </g>
+  <ellipse cx="33" cy="54" rx="9" ry="14" fill="var(--paper-2)" stroke="var(--ink)" stroke-width="2.4" transform="rotate(-28 33 54)"></ellipse>
+  <ellipse cx="87" cy="54" rx="9" ry="14" fill="var(--paper-2)" stroke="var(--ink)" stroke-width="2.4" transform="rotate(28 87 54)"></ellipse>
+  <path d="M60 37c-15 0-25 11-25 26s10 29 25 29 25-14 25-29-10-26-25-26z" fill="var(--paper-2)" stroke="var(--ink)" stroke-width="2.6"></path>
+  <circle cx="49" cy="63" r="3.2" fill="var(--ink)"></circle>
+  <circle cx="71" cy="63" r="3.2" fill="var(--ink)"></circle>
+  <ellipse cx="42" cy="72" rx="6" ry="3.4" fill="var(--accent)" opacity=".22"></ellipse>
+  <ellipse cx="78" cy="72" rx="6" ry="3.4" fill="var(--accent)" opacity=".22"></ellipse>
+  <path d="M60 70c2.6 0 4 1.4 4 3s-1.8 3-4 3-4-1.4-4-3 1.4-3 4-3z" fill="var(--accent)"></path>
+  <path d="M60 76v3" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"></path>
+  <path d="M55 82c2 2 8 2 10 0" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"></path>
+</svg></div>
     <div class="consent-modal__panel">
       <p class="consent-modal__txt" id="consentTxt">开始录音前，请先征得医生与在场其他人的同意。</p>
       <p class="consent-modal__sub">音频由浏览器语音服务处理，可能经其云端。</p>
     </div>
     <div class="consent-modal__acts">
       <button class="btn btn--primary" type="button" id="consentYes">我知道了，开始</button>
+    </div>
+  </div>
+</div>
+
+<div class="deer-modal" id="calModal" role="dialog" aria-modal="true" aria-labelledby="calTitle">
+  <div class="deer-modal__card">
+    <div class="deer-modal__art" aria-hidden="true"><svg class="deer-art" viewBox="0 0 120 120" aria-hidden="true">
+  <g fill="none" stroke="var(--accent)" stroke-width="3.2" stroke-linecap="round">
+    <path d="M44 40c-6-6-8-12-6-20"></path><path d="M40 31c-6-1-10-4-12-8"></path>
+    <path d="M76 40c6-6 8-12 6-20"></path><path d="M80 31c6-1 10-4 12-8"></path>
+  </g>
+  <ellipse cx="33" cy="54" rx="9" ry="14" fill="var(--paper-2)" stroke="var(--ink)" stroke-width="2.4" transform="rotate(-28 33 54)"></ellipse>
+  <ellipse cx="87" cy="54" rx="9" ry="14" fill="var(--paper-2)" stroke="var(--ink)" stroke-width="2.4" transform="rotate(28 87 54)"></ellipse>
+  <path d="M60 37c-15 0-25 11-25 26s10 29 25 29 25-14 25-29-10-26-25-26z" fill="var(--paper-2)" stroke="var(--ink)" stroke-width="2.6"></path>
+  <circle cx="49" cy="63" r="3.2" fill="var(--ink)"></circle>
+  <circle cx="71" cy="63" r="3.2" fill="var(--ink)"></circle>
+  <ellipse cx="42" cy="72" rx="6" ry="3.4" fill="var(--accent)" opacity=".22"></ellipse>
+  <ellipse cx="78" cy="72" rx="6" ry="3.4" fill="var(--accent)" opacity=".22"></ellipse>
+  <path d="M60 70c2.6 0 4 1.4 4 3s-1.8 3-4 3-4-1.4-4-3 1.4-3 4-3z" fill="var(--accent)"></path>
+  <path d="M60 76v3" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"></path>
+  <path d="M55 82c2 2 8 2 10 0" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"></path>
+</svg></div>
+    <h3 class="deer-modal__ttl" id="calTitle">把这次的重点放进日历？</h3>
+    <p class="deer-modal__txt">小鹿把录音里提到的复诊和用药时间整理成日程，打开文件就能加进手机日历，到点提醒你。</p>
+    <ul class="deer-modal__list" id="calList"></ul>
+    <div class="deer-modal__acts">
+      <button class="btn btn--primary" type="button" id="calYes">好，放进日历</button>
+      <button class="btn btn--ghost" type="button" id="calNo">先不用</button>
+      <button class="btn btn--ghost" type="button" id="calSet" aria-expanded="false">设置</button>
+    </div>
+    <div class="deer-modal__set" id="calSettings" hidden>
+      <label class="deer-modal__row">
+        <span>用药提醒时间</span>
+        <select id="calTime">
+          <option value="07:00">07:00</option>
+          <option value="08:00" selected>08:00</option>
+          <option value="12:00">12:00</option>
+          <option value="20:00">20:00</option>
+          <option value="21:30">21:30</option>
+        </select>
+      </label>
+      <label class="deer-modal__row">
+        <span>以后录音结束直接生成</span>
+        <input type="checkbox" id="calAuto">
+      </label>
+      <p class="deer-modal__note">只生成 .ics 日程文件，不会擅自改你的系统日历；文件打开后由你确认。</p>
     </div>
   </div>
 </div>
@@ -1660,7 +1809,16 @@ body[data-view="ask"] #app{height:100dvh}
     opts.headers = headers;
     opts.cache = 'no-store';
 
-    return fetch(API.base + path, opts).then(function (r) {
+    /* 可选超时：语音转写要几十秒，普通接口用默认的不设超时 */
+    var ctrl = (opts.timeoutMs && window.AbortController) ? new AbortController() : null;
+    var timer = null;
+    if (ctrl) {
+      opts.signal = ctrl.signal;
+      timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, opts.timeoutMs);
+    }
+    function stopTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+
+    var p = fetch(API.base + path, opts).then(function (r) {
       if (r.status === 204) return null;
       return r.text().then(function (text) {
         var body = {};
@@ -1672,6 +1830,13 @@ body[data-view="ask"] #app{height:100dvh}
         }
         return body;
       });
+    });
+
+    if (!ctrl) return p;
+    return p.then(function (v) { stopTimer(); return v; }, function (e) {
+      stopTimer();
+      if (e && e.name === 'AbortError') throw new Error('请求超时，请重试');
+      throw e;
     });
   }
 
@@ -1764,6 +1929,7 @@ body[data-view="ask"] #app{height:100dvh}
     busy: false,
     cloud: false,        // 是否已连上服务端
     saving: false,       // 归档 / 修改请求进行中
+    calPending: false,   // 刚结束一次录音，等归档弹窗关闭后问日历
     editId: '',          // 正在修改的已归档记录
     editDraft: null,
     theme: 'warm',
@@ -1789,7 +1955,7 @@ body[data-view="ask"] #app{height:100dvh}
     bindVoice();
     bindTheme();
     bindScan();
-    applyTheme(read('lx_theme_guest_v1', 'warm'), false);
+    applyTheme(read('lx_theme_guest_v1', 'light'), false);
 
     detectCloud().then(function (on) {
       state.cloud = on;
@@ -2265,7 +2431,7 @@ body[data-view="ask"] #app{height:100dvh}
     state.aiVision = '';
     state.scan = { image: '', meds: [], source: '', at: 0 };
     state.scanHist = [];
-    applyTheme(read('lx_theme_guest_v1', 'warm'), false);
+    applyTheme(read('lx_theme_guest_v1', 'light'), false);
     $('#thread').innerHTML = '';
     $('#app').hidden = true;
     $('#gate').hidden = false;
@@ -2336,13 +2502,11 @@ body[data-view="ask"] #app{height:100dvh}
           state.aiOn = !!(s && s.enabled);
           state.aiText = (s && s.text_model) || '';
           state.aiVision = (s && s.vision_model) || '';
-          renderEngine();
-          if (state.view === 'scan') renderScan();
+                if (state.view === 'scan') renderScan();
         })
         .catch(function () {
           state.aiOn = false;
-          renderEngine();
-        });
+              });
 
       apiFetch('/api/me/profile')
         .then(function (p) {
@@ -2436,10 +2600,10 @@ body[data-view="ask"] #app{height:100dvh}
   /* ============================================================
      5.5 主题（三套，账号隔离）
      ============================================================ */
-  var THEMES = ['warm', 'dark', 'light'];
+  var THEMES = ['light', 'warm', 'dark', 'sakura'];
 
   function applyTheme(id, remember) {
-    if (THEMES.indexOf(id) === -1) id = 'warm';
+    if (THEMES.indexOf(id) === -1) id = 'light';
     document.documentElement.setAttribute('data-theme', id);
     state.theme = id;
     var sel = $('#themeSel');
@@ -2479,8 +2643,7 @@ body[data-view="ask"] #app{height:100dvh}
     if (!Array.isArray(state.scanHist)) state.scanHist = [];
     state.scan = { image: '', meds: [], source: '', at: 0 };
     /* 新账号不继承上一个账号的主题：没有自己的主题就用默认暖纸 */
-    applyTheme(read(LS.theme(name), 'warm'), false);
-    renderEngine();
+    applyTheme(read(LS.theme(name), 'light'), false);
   }
 
   function aiCfg() {
@@ -2686,30 +2849,10 @@ body[data-view="ask"] #app{height:100dvh}
   }
 
   function renderScan() {
-    renderEngine();
     renderScanHist();
     renderScanResults();
     showPreview(state.scan.image || '');
     if (!state.scan.image) setScanStatus('选一张图，识别药名、剂量、频次与饭前饭后。', false);
-  }
-
-  function renderEngine() {
-    var ready = aiVisionReady();
-    var tag = $('#scanEngine');
-    if (tag) tag.textContent = ready ? '千问 VL' : '手动录入';
-    var badge = $('#aiEngineTag');
-    if (badge) {
-      badge.textContent = ready ? '已接入' : (API.on ? '未接入' : '本机模式');
-      badge.classList.toggle('is-off', !ready);
-    }
-    var hint = $('#aiHint');
-    if (hint) {
-      hint.innerHTML = ready
-        ? '已接入 <b>' + esc(aiCfg().visionModel) + '</b>：拍完直接识别，字段仍可手改。'
-        : (API.on
-          ? '服务端暂未接入识别引擎，可手动录入药名与用法。'
-          : '本机模式没有识别引擎，可手动录入药名与用法。');
-    }
   }
 
   function renderScanResults() {
@@ -2915,8 +3058,7 @@ body[data-view="ask"] #app{height:100dvh}
     };
     state.ai = cfg;
     if (write(LS.ai(state.user), cfg)) {
-      renderEngine();
-      renderAiState();
+        renderAiState();
     }
   }
 
@@ -3675,6 +3817,9 @@ body[data-view="ask"] #app{height:100dvh}
     /* 首页右侧「询问」：直接进对话页；不涉及录音，所以不弹同意提示 */
     $('#askNow').addEventListener('click', function () { go('ask'); });
 
+    bindAskMic();
+    bindCalendarModal();
+
     /* 键盘用户的跳转链接：先切到询问页，再把焦点放进输入框 */
     var skip = $('#skipAsk');
     if (skip) skip.addEventListener('click', function (e) {
@@ -3849,7 +3994,9 @@ body[data-view="ask"] #app{height:100dvh}
   function startRec() {
     /* 录音属于「记录」模块：从询问页点录音先回到记录页，否则转写落在看不见的地方 */
     if (state.view !== 'work') go('work');
-    if (!SR) {
+    var canLive = !!SR;
+    var canAudio = !!(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    if (!canLive && !(canAudio && API.on)) {
       toast('这个浏览器不支持语音识别。用「手动整理」贴文字，一样能存成记录。');
       $('#manualText').focus();
       return;
@@ -3862,6 +4009,15 @@ body[data-view="ask"] #app{height:100dvh}
     state.interim = '';
     renderTranscript();
     stopSpeech();
+    startAudioCapture();
+
+    if (!canLive) {
+      /* 没有浏览器实时识别：先录音，停下后交给千问转写 */
+      state.recording = true;
+      setLive('live');
+      $('#trMeta').textContent = '录音中 · 结束后由千问转写';
+      return;
+    }
 
     try {
       recognition = new SR();
@@ -3951,20 +4107,119 @@ body[data-view="ask"] #app{height:100dvh}
     finishLock = true;
     setTimeout(function () { finishLock = false; }, 900);
 
-    var text = joinLines(state.lines);
+    var browserText = joinLines(state.lines);
     state.interim = '';
     renderTranscript();
 
-    if (!text) {
+    var hadAudio = !!(recAudio.rec && recAudio.rec.state !== 'inactive');
+
+    if (!browserText && !hadAudio) {
       setLive('idle');
       $('#trMeta').textContent = state.recFailed ? '麦克风不可用' : '没有识别到内容';
       if (!state.recFailed) toast('这轮没听到有效内容。再试一次，或手动贴文字。');
       else $('#manualText').focus();
       return;
     }
+
     setLive('ok');
-    $('#trMeta').textContent = '已转写 ' + state.lines.length + ' 段 · ' + text.length + ' 字';
-    buildDraft(text, 'voice', state.lines.length);
+    $('#trMeta').textContent = browserText
+      ? '已转写 ' + state.lines.length + ' 段 · ' + browserText.length + ' 字'
+      : '录音结束 · 正在转写…';
+
+    refineRecordingText(browserText).then(function (text) {
+      if (!text) {
+        setLive('idle');
+        $('#trMeta').textContent = '没有识别到内容';
+        toast('没听清这段录音。再说一次，或手动贴文字。');
+        return;
+      }
+      $('#trMeta').textContent = '已转写 ' + text.length + ' 字 · 正在整理，确认后可归档';
+      /* 归档弹窗关闭后，再问要不要把复诊/用药放进日历 */
+      state.calPending = true;
+      buildDraft(text, 'voice', state.lines.length || 1);
+    });
+  }
+
+  /* ——— 录音音频与千问转写 ——— */
+  var recAudio = { rec: null, chunks: [], mime: '', stream: null };
+
+  function blobToDataURL(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(String(fr.result)); };
+      fr.onerror = function () { reject(new Error('读不到录音数据')); };
+      fr.readAsDataURL(blob);
+    });
+  }
+
+  function startAudioCapture() {
+    if (!navigator.mediaDevices || !window.MediaRecorder) return;
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      recAudio.stream = stream;
+      recAudio.chunks = [];
+      var rec = new MediaRecorder(stream);
+      recAudio.mime = rec.mimeType || 'audio/webm';
+      rec.ondataavailable = function (e) {
+        if (e.data && e.data.size) recAudio.chunks.push(e.data);
+      };
+      rec.start();
+      recAudio.rec = rec;
+    }).catch(function () {
+      /* 拿不到麦克风也不影响浏览器实时识别 */
+    });
+  }
+
+  function stopAudioCapture() {
+    return new Promise(function (resolve) {
+      var rec = recAudio.rec;
+      var stream = recAudio.stream;
+      if (!rec || rec.state === 'inactive') { resolve(null); return; }
+      var settled = false;
+      function finish() {
+        if (settled) return;
+        settled = true;
+        try { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+        var blob = recAudio.chunks.length
+          ? new Blob(recAudio.chunks, { type: recAudio.mime || 'audio/webm' })
+          : null;
+        recAudio.rec = null;
+        recAudio.chunks = [];
+        resolve(blob);
+      }
+      rec.onstop = finish;
+      try { rec.stop(); } catch (e) { finish(); }
+      setTimeout(finish, 4000);
+    });
+  }
+
+  /* 浏览器转写 + 千问转写取更完整的一份；都没有就返回原文 */
+  function refineRecordingText(browserText) {
+    return stopAudioCapture().then(function (blob) {
+      if (!blob || !API.on || blob.size < 2000) return browserText;
+      if (blob.size > 7 * 1024 * 1024) return browserText;
+      return blobToDataURL(blob).then(function (url) {
+        return apiFetch('/api/ai/asr', {
+          method: 'POST', body: { audio: url }, timeoutMs: 90000
+        });
+      }).then(function (res) {
+        var t = clean(res && res.text);
+        if (!t || t.length < 4) return browserText;
+        if (!browserText) {
+          state.lines = [{ t: Date.now(), text: t }];
+          renderTranscript();
+          return t;
+        }
+        if (t.length >= browserText.length * 0.6) {
+          state.lines = [{ t: Date.now(), text: t }];
+          renderTranscript();
+          toast('转写已用千问校对');
+          return t;
+        }
+        return browserText;
+      });
+    }).catch(function () {
+      return browserText;
+    });
   }
 
   function joinLines(lines) {
@@ -5531,6 +5786,363 @@ body[data-view="ask"] #app{height:100dvh}
       close();
       if (typeof onConfirm === 'function') onConfirm();
     };
+  }
+
+
+  /* ============================================================
+     语音输入（询问页）与录音转写共用同一个服务端接口
+     ============================================================ */
+  var askAudio = { rec: null, chunks: [], timer: null };
+
+  function setMic(state) {
+    var btn = $('#askMic');
+    if (!btn) return;
+    btn.classList.toggle('is-live', state === 'live');
+    btn.classList.toggle('is-busy', state === 'busy');
+    btn.setAttribute('aria-pressed', state === 'live' ? 'true' : 'false');
+    btn.disabled = state === 'busy';
+  }
+
+  function toggleAskMic() {
+    if (askAudio.rec && askAudio.rec.state === 'recording') { stopAskMic(); return; }
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      toast('这个浏览器不支持录音，换 Chrome / Edge 试试');
+      return;
+    }
+    setMic('busy');
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      askAudio.chunks = [];
+      var rec = new MediaRecorder(stream);
+      rec.ondataavailable = function (e) {
+        if (e.data && e.data.size) askAudio.chunks.push(e.data);
+      };
+      rec.onstop = function () {
+        try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+        askAudio.rec = null;
+        transcribeAsk();
+      };
+      rec.start();
+      askAudio.rec = rec;
+      setMic('live');
+      toast('开始说了，再点一下结束');
+      askAudio.timer = setTimeout(stopAskMic, 60000);
+    }).catch(function (e) {
+      setMic('');
+      toast('没有拿到麦克风：' + (e && e.message ? e.message : '被拒绝'));
+    });
+  }
+
+  function stopAskMic() {
+    clearTimeout(askAudio.timer);
+    var rec = askAudio.rec;
+    if (!rec || rec.state === 'inactive') { setMic(''); return; }
+    setMic('busy');
+    try { rec.stop(); } catch (e) { setMic(''); }
+  }
+
+  function transcribeAsk() {
+    clearTimeout(askAudio.timer);
+    var blob = new Blob(askAudio.chunks, {
+      type: (askAudio.chunks[0] && askAudio.chunks[0].type) || 'audio/webm'
+    });
+    if (!blob.size) { setMic(''); toast('没有录到声音'); return; }
+    if (!API.on) { setMic(''); toast('本机模式没有语音转写，先手动输入'); return; }
+
+    blobToDataURL(blob).then(function (url) {
+      return apiFetch('/api/ai/asr', { method: 'POST', body: { audio: url }, timeoutMs: 90000 });
+    }).then(function (res) {
+      var t = clean(res && res.text);
+      if (!t) { toast('没听清，再说一次？'); return; }
+      var input = $('#askInput');
+      input.value = input.value.trim() ? input.value.replace(/\s+$/, '') + ' ' + t : t;
+      autoGrow();
+      input.focus();
+    }).catch(function (e) {
+      toast('语音转写失败：' + (e && e.message ? e.message : '未知错误'));
+    }).then(function () {
+      setMic('');
+    });
+  }
+
+  function bindAskMic() {
+    var btn = $('#askMic');
+    if (!btn) return;
+    btn.addEventListener('click', toggleAskMic);
+  }
+
+  /* ============================================================
+     录音结束：小鹿问「要不要放进日历」，选是就生成 .ics
+     ============================================================ */
+  var CAL = { time: '08:00', auto: false };
+  var calEventsCache = [];
+
+  function calStoreKey() { return 'lx_cal_v1_' + state.user; }
+  function loadCal() {
+    var c = read(calStoreKey(), null);
+    if (c && typeof c === 'object') {
+      CAL.time = /^\d{2}:\d{2}$/.test(String(c.time || '')) ? c.time : '08:00';
+      CAL.auto = !!c.auto;
+    } else {
+      CAL.time = '08:00';
+      CAL.auto = false;
+    }
+  }
+  function saveCal() {
+    if (!state.user) return;
+    write(calStoreKey(), { time: CAL.time, auto: CAL.auto });
+  }
+
+  var CN_NUM = { '零': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10 };
+  function cnNum(str) {
+    if (!str) return NaN;
+    if (/^\d+$/.test(str)) return parseInt(str, 10);
+    if (str === '十') return 10;
+    if (str.length === 2 && str.charAt(0) === '十') return 10 + (CN_NUM[str.charAt(1)] || 0);
+    if (str.length === 2 && str.charAt(1) === '十') return (CN_NUM[str.charAt(0)] || 0) * 10;
+    if (str.length === 3 && str.charAt(1) === '十') {
+      return (CN_NUM[str.charAt(0)] || 0) * 10 + (CN_NUM[str.charAt(2)] || 0);
+    }
+    return Object.prototype.hasOwnProperty.call(CN_NUM, str) ? CN_NUM[str] : NaN;
+  }
+
+  /* 「两周后」「3 个月后」「10月20日」都折成时间戳 */
+  function followUpDate(text, base) {
+    var t = clean(text);
+    if (!t) return null;
+    var d;
+    var m = t.match(/(\d{4})[年\-\.](\d{1,2})[月\-\.](\d{1,2})/);
+    if (m) {
+      d = new Date(+m[1], +m[2] - 1, +m[3]);
+      return isNaN(d.getTime()) ? null : d.getTime();
+    }
+    m = t.match(/(\d{1,2})月(\d{1,2})[日号]/);
+    if (m) {
+      var y = new Date(base).getFullYear();
+      d = new Date(y, +m[1] - 1, +m[2]);
+      if (d.getTime() < new Date(base).setHours(0, 0, 0, 0)) d.setFullYear(y + 1);
+      return d.getTime();
+    }
+    m = t.match(/([一二两三四五六七八九十\d]+)\s*(周|星期|天|日|个月|月)\s*(?:以?后|之后)?/);
+    if (m) {
+      var n = cnNum(m[1]);
+      if (!isFinite(n) || n <= 0) return null;
+      d = new Date(base);
+      if (m[2] === '周' || m[2] === '星期') d.setDate(d.getDate() + n * 7);
+      else if (m[2] === '天' || m[2] === '日') d.setDate(d.getDate() + n);
+      else d.setMonth(d.getMonth() + n);
+      return d.getTime();
+    }
+    return null;
+  }
+
+  function calTimeToDate(base, hhmm) {
+    var d = new Date(base);
+    var parts = String(hhmm || CAL.time).split(':');
+    d.setHours(+parts[0] || 8, +parts[1] || 0, 0, 0);
+    return d;
+  }
+
+  function medTimeFor(med) {
+    var timing = String((med && med.timing) || '');
+    if (/睡前/.test(timing)) return '21:30';
+    if (/空腹/.test(timing) && CAL.time === '08:00') return '07:00';
+    return CAL.time;
+  }
+
+  function buildCalEvents(draft) {
+    var out = [];
+    if (!draft) return out;
+    var base = draft.at || Date.now();
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var startBase = new Date(Math.max(base, today.getTime()));
+
+    (draft.meds || []).forEach(function (m) {
+      if (!m || !m.name) return;
+      var days = parseInt(String(m.days || '').replace(/[^\d]/g, ''), 10);
+      var count = days > 0 ? Math.min(days, 90) : 1;
+      var start = calTimeToDate(startBase, medTimeFor(m));
+      out.push({
+        title: '吃药：' + m.name + (m.dose ? ' ' + m.dose : ''),
+        desc: [m.freq, m.timing, days ? '共 ' + days + ' 天' : '记录里没写疗程']
+          .filter(Boolean).join(' · ') + '。来自小鹿病历记录。',
+        start: start,
+        minutes: 15,
+        rrule: 'FREQ=DAILY;COUNT=' + count,
+        when: fmtDate(start.getTime()) + ' ' + fmtTime(start.getTime()) +
+          ' 起 · 每天 · ' + (days ? days + ' 天' : '1 天')
+      });
+    });
+
+    var fu = followUpDate(draft.followUp, base);
+    if (fu) {
+      var d = new Date(fu);
+      d.setHours(9, 0, 0, 0);
+      out.push({
+        title: '复诊' + (draft.hospital ? '：' + draft.hospital : ''),
+        desc: '上次就诊 ' + fmtDate(base) + (draft.summary ? ' · ' + draft.summary : '') +
+          '。来自小鹿病历记录。',
+        start: d,
+        minutes: 30,
+        alarm: '-P1D',
+        when: fmtDate(d.getTime()) + ' ' + fmtTime(d.getTime()) + ' · 提前一天提醒'
+      });
+    }
+    return out;
+  }
+
+  function renderCalList(events) {
+    var box = $('#calList');
+    if (!box) return;
+    if (!events.length) {
+      box.innerHTML = '<li class="is-empty">这次记录里没有明确的复诊或用药时间，暂时没有可加进日历的内容。</li>';
+      return;
+    }
+    box.innerHTML = events.map(function (ev) {
+      return '<li><b>' + esc(ev.title) + '</b><span>' + esc(ev.when) + '</span></li>';
+    }).join('');
+  }
+
+  function icsEscape(v) {
+    return String(v == null ? '' : v)
+      .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,')
+      .replace(/\r?\n/g, '\\n');
+  }
+  function icsLocal(d) {
+    return '' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + 'T' +
+      pad(d.getHours()) + pad(d.getMinutes()) + '00';
+  }
+  function icsFold(line) {
+    var out = '', cur = '', bytes = 0;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line.charAt(i);
+      var b = 1;
+      try { b = unescape(encodeURIComponent(ch)).length; } catch (e) { b = 1; }
+      if (bytes + b > 72) { out += cur + '\r\n '; cur = ''; bytes = 0; }
+      cur += ch; bytes += b;
+    }
+    return out + cur;
+  }
+
+  function buildICS(events) {
+    var lines = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Xiaolu Medrec//CN',
+      'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'
+    ];
+    var stamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z').replace(/[-:]/g, '');
+    events.forEach(function (ev, i) {
+      var end = new Date(ev.start.getTime() + (ev.minutes || 15) * 60000);
+      lines.push('BEGIN:VEVENT');
+      lines.push('UID:xiaolu-' + Date.now() + '-' + i + '@xiaolu.local');
+      lines.push('DTSTAMP:' + stamp);
+      lines.push('DTSTART:' + icsLocal(ev.start));
+      lines.push('DTEND:' + icsLocal(end));
+      lines.push('SUMMARY:' + icsEscape(ev.title));
+      lines.push('DESCRIPTION:' + icsEscape(ev.desc || ''));
+      if (ev.rrule) lines.push('RRULE:' + ev.rrule);
+      lines.push('BEGIN:VALARM');
+      lines.push('TRIGGER:' + (ev.alarm || '-PT0M'));
+      lines.push('ACTION:DISPLAY');
+      lines.push('DESCRIPTION:' + icsEscape(ev.title));
+      lines.push('END:VALARM');
+      lines.push('END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    return lines.map(icsFold).join('\r\n') + '\r\n';
+  }
+
+  function downloadICS(events) {
+    var ics = buildICS(events);
+    var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = '小鹿-复诊用药-' + fmtDate(Date.now()).replace(/\./g, '') + '.ics';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try { URL.revokeObjectURL(url); } catch (e) {}
+      if (a.parentNode) a.parentNode.removeChild(a);
+    }, 1500);
+  }
+
+  function openDeerModal() {
+    loadCal();
+    calEventsCache = state.draft ? buildCalEvents(state.draft) : [];
+    renderCalList(calEventsCache);
+    var yes = $('#calYes');
+    if (yes) yes.disabled = !calEventsCache.length;
+    if ($('#calTime')) $('#calTime').value = CAL.time;
+    if ($('#calAuto')) $('#calAuto').checked = CAL.auto;
+    if ($('#calSettings')) $('#calSettings').hidden = true;
+    if ($('#calSet')) $('#calSet').setAttribute('aria-expanded', 'false');
+    var modal = $('#calModal');
+    if (!modal) return;
+    modal.classList.add('is-on');
+    setTimeout(function () {
+      var el = calEventsCache.length ? $('#calYes') : $('#calNo');
+      if (el) el.focus();
+    }, 40);
+  }
+
+  function closeDeerModal() {
+    var modal = $('#calModal');
+    if (modal) modal.classList.remove('is-on');
+  }
+
+  function bindCalendarModal() {
+    var modal = $('#calModal');
+    if (!modal) return;
+
+    $('#calNo').addEventListener('click', closeDeerModal);
+
+    $('#calSet').addEventListener('click', function () {
+      var box = $('#calSettings');
+      var willOpen = box.hidden;
+      box.hidden = !willOpen;
+      this.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+
+    $('#calTime').addEventListener('change', function () {
+      CAL.time = this.value;
+      saveCal();
+      calEventsCache = state.draft ? buildCalEvents(state.draft) : [];
+      renderCalList(calEventsCache);
+    });
+
+    $('#calAuto').addEventListener('change', function () {
+      CAL.auto = this.checked;
+      saveCal();
+      toast(CAL.auto ? '以后录音结束会直接生成日程文件。' : '已关闭自动生成。');
+    });
+
+    $('#calYes').addEventListener('click', function () {
+      if (!calEventsCache.length) return;
+      downloadICS(calEventsCache);
+      closeDeerModal();
+      toast('日程文件已生成，打开就能加进日历。');
+    });
+
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeDeerModal();
+    });
+    modal.addEventListener('keydown', function (e) {
+      if (e && e.key === 'Escape') closeDeerModal();
+    });
+
+    /* 归档弹窗关闭（无论保存还是取消）后再问日历，避免两个弹窗叠在一起 */
+    var dlg = $('#saveDialog');
+    if (dlg) dlg.addEventListener('close', function () {
+      if (!state.calPending) return;
+      state.calPending = false;
+      loadCal();
+      var evs = state.draft ? buildCalEvents(state.draft) : [];
+      if (CAL.auto) {
+        if (evs.length) { downloadICS(evs); toast('已按设置生成日历文件。'); }
+        return;
+      }
+      openDeerModal();
+    });
   }
 
 })();

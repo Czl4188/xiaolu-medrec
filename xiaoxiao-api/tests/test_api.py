@@ -485,3 +485,27 @@ def test_ai_requires_login(client):
 def test_ai_status_closed_when_not_configured(client, fresh_headers):
     body = client.get("/api/ai/status", headers=fresh_headers).json()
     assert body["enabled"] is False
+
+
+# ————————————————— 医生嘱咐 / 语音转写校验 —————————————————
+def test_doctor_question_answers_with_record_content(client, fresh_headers):
+    _new_record(client, fresh_headers, client_id="doc_001")
+    r = client.post("/api/chat/sync", headers=fresh_headers, json={"question": "医生说了什么？"})
+    assert r.status_code == 200, r.text
+    answer = r.json()["answer"]
+    assert "慢性胃炎伴糜烂" in answer
+    assert "奥美拉唑" in answer
+    assert "两周后来复诊" in answer
+    assert r.json()["citations"]
+
+
+def test_asr_requires_login(client):
+    assert client.post("/api/ai/asr", json={"audio": "data:audio/webm;base64,AAA"}).status_code == 401
+
+
+def test_asr_rejects_bad_payload(client, fresh_headers):
+    assert client.post("/api/ai/asr", headers=fresh_headers,
+                       json={"audio": "hello"}).status_code == 400
+    big = "data:audio/webm;base64," + "A" * 12_000_001
+    assert client.post("/api/ai/asr", headers=fresh_headers,
+                       json={"audio": big}).status_code == 413

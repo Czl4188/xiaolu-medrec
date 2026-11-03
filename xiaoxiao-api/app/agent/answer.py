@@ -36,6 +36,8 @@ DOSE_Q = re.compile(r"剂量|多少毫克|吃几片|怎么吃|饭前|饭后|服�
 FOLLOW_Q = re.compile(r"复诊|复查|随访|什么时候再去")
 ALLERGY_Q = re.compile(r"过敏|禁忌")
 NOTE_Q = re.compile(r"注意|忌口|交代|医嘱|忌什么")
+# 「医生说了什么 / 怎么嘱咐的」：问的是这次就诊的整段内容，不该拒答
+DOCTOR_Q = re.compile(r"医生说了|医生说的|医生怎么|嘱咐|说了什么|说了啥|怎么说的|原话|讲了什么")
 COUNT_Q = re.compile(r"几次|多少次|一共.*次|看过.*回")
 LAST_Q = re.compile(r"上次|上回|最近一次|什么时候看|哪天看|时间线|就诊历史|最近.*医院")
 
@@ -540,6 +542,33 @@ def answer(question: str, records: list[dict]) -> dict:
         return {"answer": f"{_where(target)} 医生交代的是：\n"
                           + "\n".join(f"- {n}" for n in target["notes"]),
                 "citations": [cite_of(target)], "refused": False}
+
+    # —— 12.5 医生说了什么：复述该次记录里的诊断、用药、复诊与注意事项 ——
+    if DOCTOR_Q.search(q):
+        target, matched, explicit = _select(q, recs)
+        if explicit and not target:
+            return _no_match(q, recs)
+        if target is None:
+            target = last
+        lines = [f"按 {_where(target)} 那次记录：", ""]
+        if target.get("summary"):
+            lines.append(f"诊断：{target['summary']}。")
+        meds = target.get("meds") or []
+        if meds:
+            lines.append("用药：" + "、".join(_med_line(m) for m in meds) + "。")
+        if target.get("follow_up"):
+            lines.append(f"复诊：{target['follow_up']}。")
+        notes = target.get("notes") or []
+        if notes:
+            lines.append("注意事项：" + "；".join(notes) + "。")
+        text = (target.get("transcript") or "").strip()
+        if len(lines) <= 2:
+            return {"answer": "病历档案未查询到该内容，无法回答。\n\n"
+                              f"{_where(target)} 那次只存了转写，没有可复述的字段。",
+                    "citations": [cite_of(target)], "refused": True}
+        if text:
+            lines += ["", f"原话节选：「{text[:140]}{'…' if len(text) > 140 else ''}」"]
+        return {"answer": "\n".join(lines), "citations": [cite_of(target)], "refused": False}
 
     # —— 13. 次数 / 时间线 ——
     pool, explicit, label = _filter_pool(q, recs)

@@ -19,6 +19,13 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 MAX_CHARS = 12000
 MAX_IMAGE_CHARS = 6_000_000
+# 音频 base64 上限：约 9MB 原始音频，足够 3 分钟 opus
+MAX_AUDIO_CHARS = 12_000_000
+
+ASR_SYS = (
+    "你是语音转写器。只把音频里说的话逐字转成文字，不要回答、不要解释、不要总结、不要补充。"
+    "听不清的地方留空，不要猜；没有语音就输出空字符串。"
+)
 
 VISION_SYS = "你是药品包装与处方的识别器。只输出 JSON，不要解释，不要 Markdown 代码块。"
 VISION_USER = (
@@ -66,6 +73,7 @@ async def _call(
     temperature: float,
     max_tokens: int,
     timeout: float,
+    extra: dict | None = None,
 ) -> str:
     if not _enabled():
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "服务端未配置识别引擎")
@@ -78,6 +86,8 @@ async def _call(
         "max_tokens": max_tokens,
         "stream": False,
     }
+    if extra:
+        payload.update(extra)
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
@@ -147,3 +157,45 @@ async def vision(body: VisionIn, _user: User = Depends(current_user)) -> dict:
     ]
     text = await _call(messages, settings.llm_vision_model, temperature=0.1, max_tokens=900, timeout=65)
     return {"text": text}
+
+
+@router.post("/asr", dependencies=[Depends(rate_limit("ai:asr", 20))])
+async def asr(body: dict, _user: User = Depends(current_user)) -> dict:
+    """语音转写：浏览器录音（webm/opus、mp4、wav 的 data URL）→ 文字。
+
+    走的是能听音频的对话模型，和文本模型共用同一套网关配置；
+    只返回转写文本，不生成任何回答。
+    """
+    audio = str(body.get("audio") or "").strip()
+    if not audio.startswith("data:audio/") or ";base64," not in audio:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "音频格式不正确")
+    if len(audio) > MAX_AUDIO_CHARS:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "录音过长，请分段说")
+
+    messages = [
+        {"role": "system", "content": ASR_SYS},
+        {"role": "user", "content": [
+            {"type": "input_audio", "input_audio": {"data": audio}},
+        ]},
+    ]
+    text = await _call(
+        messages,
+        settings.asr_chat_model,
+        temperature=0.0,
+        max_tokens=1500,
+        timeout=90,
+        extra={"modalities": ["text"]},
+    )
+    return {"text": _clean_asr(text)}
+
+
+def _clean_asr(text: str) -> str:
+    """模型偶尔会带「转写：」前缀或引号，这里统一清掉，避免脏文本进档案。"""
+    t = str(text or "").strip()
+    for prefix in ("转写：", "转写:", "音频内容：", "音频内容:", "文字："):
+        if t.startswith(prefix):
+            t = t[len(prefix):].strip()
+    if len(t) >= 2 and t[0] in "“\"「'" and t[-1] in "”\"」'":
+        t = t[1:-1].strip()
+    t = " ".join(t.split())
+    return t[:4000]
