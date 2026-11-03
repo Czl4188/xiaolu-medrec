@@ -465,7 +465,7 @@ def answer(question: str, records: list[dict]) -> dict:
         if explicit and matched > 1:
             lines.append(f"（同一天 / 同一家医院有 {matched} 次记录，上面是最近的一次。）")
         cites = [cite_of(target)]
-        if not explicit and len(recs) > 1:
+        if not explicit and not SINGLE_Q.search(q) and len(recs) > 1:
             others = []
             for rec in recs:
                 if rec["id"] == target["id"]:
@@ -530,7 +530,7 @@ def answer(question: str, records: list[dict]) -> dict:
             lines.append(f"（这是最近一份有用药记录的档案；更新的一次 {fmt_date(last['visit_at'])} 没有开药。）")
 
         # 8b. 没有指定日期/医院时，把更早记录里的药也列出来；指定了就严格只答那一次
-        older = ([] if explicit else
+        older = ([] if (explicit or SINGLE_Q.search(q)) else
                  [(m, r) for (m, r) in _all_meds(recs) if r["id"] != target["id"]])
         if older:
             lines.append("")
@@ -604,7 +604,7 @@ def answer(question: str, records: list[dict]) -> dict:
                     "citations": [cite_of(fallback)], "refused": False}
         lines = [f"记的是：{target['follow_up']}。", "", f"出自 {_where(target)} 那次。"]
         cites = [cite_of(target)]
-        if not explicit:
+        if not explicit and not SINGLE_Q.search(q):
             ups = [(r, r["follow_up"]) for r in recs
                    if r["id"] != target["id"] and r.get("follow_up")]
             if ups:
@@ -645,7 +645,7 @@ def answer(question: str, records: list[dict]) -> dict:
         lines = [f"{_where(target)} 医生交代的是："]
         lines += [f"- {n}" for n in target["notes"]]
         cites = [cite_of(target)]
-        if not explicit:
+        if not explicit and not SINGLE_Q.search(q):
             seen = {str(n).strip() for n in target["notes"]}
             older = []
             for rec in recs:
