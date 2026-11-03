@@ -139,6 +139,14 @@ cp xiaoxiao-ai/app.html xiaoxiao-api/web/app.html
 
 测试数据一律用虚构信息，账号用临时注册。
 
+建议开启仓库自带的提交检查：
+
+```bash
+git config core.hooksPath .githooks
+```
+
+它会在 `git commit` 时拦截 `.env`、`config.env`、`*.key`、`*.db`、`data/`、`dist/`，以及内容里疑似 `sk-` 开头的长串。
+
 ---
 
 ## 9. PR 检查清单
