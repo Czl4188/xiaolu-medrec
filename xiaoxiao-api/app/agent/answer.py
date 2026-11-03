@@ -40,6 +40,10 @@ NOTE_Q = re.compile(r"注意|忌口|交代|医嘱|忌什么")
 DOCTOR_Q = re.compile(r"医生说了|医生说的|医生怎么|嘱咐|说了什么|说了啥|怎么说的|原话|讲了什么")
 COUNT_Q = re.compile(r"几次|多少次|一共.*次|看过.*回")
 LAST_Q = re.compile(r"上次|上回|最近一次|什么时候看|哪天看|时间线|就诊历史|最近.*医院")
+# 问的是「全部 / 都用过 / 一共」，要跨记录汇总，不能只答最近一份
+HISTORY_Q = re.compile(r"所有|全部|都(?:有|用|吃|开|记)?|一直|曾经|历史|历次|一共|哪些药|用过什么|吃过什么|开过什么")
+# 明确指向某一次，只答那一次
+SINGLE_Q = re.compile(r"上次|上回|最近|这次|那次|刚刚|刚才|今天")
 
 # 具体临床事件/疾病：用户问到了、档案里却没有，就不能拿别的记录顶上
 CLINICAL = re.compile(
@@ -243,6 +247,34 @@ def _filter_pool(question: str, records: list[dict]) -> tuple[list[dict], bool, 
     return pool, explicit, "，".join(bits)
 
 
+def _all_meds(records: list[dict]) -> list[tuple[dict, dict]]:
+    """按「最近优先」跨记录收集药，同名药只保留最近一次。"""
+    seen: set[str] = set()
+    out: list[tuple[dict, dict]] = []
+    for rec in records:
+        for med in rec.get("meds") or []:
+            name = str(med.get("name") or "").strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            out.append((med, rec))
+    return out
+
+
+def _named_med(question: str, records: list[dict]) -> tuple[dict, dict] | None:
+    """问题里点名了某个药，就在全部档案里找它最近的一次。"""
+    q = question.replace(" ", "")
+    for rec in records:
+        for med in rec.get("meds") or []:
+            name = str(med.get("name") or "").replace(" ", "")
+            if len(name) < 2:
+                continue
+            core = re.sub(r"(胶囊|片|颗粒|口服液|注射液|软膏|滴剂|喷雾剂|缓释片|肠溶片|肠溶胶囊)$", "", name)
+            if name in q or (len(core) >= 2 and core in q):
+                return med, rec
+    return None
+
+
 def _select(question: str, records: list[dict], need: str = "") -> tuple[dict | None, int, bool]:
     pool, explicit, _ = _filter_pool(question, records)
     if explicit:
@@ -432,22 +464,53 @@ def answer(question: str, records: list[dict]) -> dict:
         lines.extend(f"- {c}" for c in conditions)
         if explicit and matched > 1:
             lines.append(f"（同一天 / 同一家医院有 {matched} 次记录，上面是最近的一次。）")
+        cites = [cite_of(target)]
         if not explicit and len(recs) > 1:
             others = []
             for rec in recs:
                 if rec["id"] == target["id"]:
                     continue
                 cs = _all_conditions([rec])
+                if not cs and rec.get("summary"):
+                    cs = [rec["summary"]]
                 if cs:
-                    others.append(f"{fmt_date(rec['visit_at'])}：{'、'.join(cs)}")
+                    others.append((rec, list(dict.fromkeys(cs))))
             if others:
-                lines.append("更早的记录：")
-                lines.extend(f"- {o}" for o in others[:3])
-        return {"answer": "\n".join(lines), "citations": [cite_of(target)], "refused": False}
+                lines.append("")
+                lines.append("更早的记录里也记了：")
+                for rec, cs in others[:5]:
+                    lines.append(f"- {fmt_date(rec['visit_at'])}：{'、'.join(cs)}")
+                if len(others) > 5:
+                    lines.append(f"（还有 {len(others) - 5} 次未列出。）")
+                for rec, _ in others[:2]:
+                    c = cite_of(rec)
+                    if c["record_id"] not in {x["record_id"] for x in cites}:
+                        cites.append(c)
+        return {"answer": "\n".join(lines), "citations": cites, "refused": False}
 
     # —— 8. 药单（先定位记录，再取该次用药）——
     if MED_Q.search(q):
         target, matched, explicit, skipped = _select_meds(q, recs)
+
+        # 8a. 「都用过什么药 / 一共开过哪些」：跨全部档案汇总，同名以最近一次为准
+        if not explicit and HISTORY_Q.search(q) and not LAST_Q.search(q):
+            items = _all_meds(recs)
+            if not items:
+                return {"answer": "病历档案未查询到该内容，无法回答。\n\n"
+                                  f"你的 {len(recs)} 份记录里都没有用药。",
+                        "citations": [], "refused": True}
+            lines = [f"你的 {len(recs)} 份记录里一共提到 {len(items)} 种药（同名以最近一次为准）："]
+            for m, rec in items[:12]:
+                lines.append(f"- {_med_line(m)} —— {_where(rec)}")
+            if len(items) > 12:
+                lines.append(f"（还有 {len(items) - 12} 种未列出。）")
+            cites = []
+            for _, rec in items:
+                c = cite_of(rec)
+                if c["record_id"] not in {x["record_id"] for x in cites}:
+                    cites.append(c)
+            return {"answer": "\n".join(lines), "citations": cites[:4], "refused": False}
+
         if explicit and not target:
             return _no_match(q, recs)
         if target is None:
@@ -465,11 +528,39 @@ def answer(question: str, records: list[dict]) -> dict:
             lines.append(f"（有 {matched} 次记录符合条件，上面是最近的一次。）")
         elif not explicit and target["id"] != last["id"]:
             lines.append(f"（这是最近一份有用药记录的档案；更新的一次 {fmt_date(last['visit_at'])} 没有开药。）")
-        return {"answer": "\n".join(lines), "citations": [cite_of(target)], "refused": False}
+
+        # 8b. 没有指定日期/医院时，把更早记录里的药也列出来；指定了就严格只答那一次
+        older = ([] if explicit else
+                 [(m, r) for (m, r) in _all_meds(recs) if r["id"] != target["id"]])
+        if older:
+            lines.append("")
+            lines.append("更早的记录里还提到：")
+            for m, rec in older[:5]:
+                lines.append(f"- {_med_line(m)}（{fmt_date(rec['visit_at'])}）")
+            if len(older) > 5:
+                lines.append(f"（还有 {len(older) - 5} 种未列出。）")
+
+        cites = [cite_of(target)]
+        for _, rec in older[:2]:
+            c = cite_of(rec)
+            if c["record_id"] not in {x["record_id"] for x in cites}:
+                cites.append(c)
+        return {"answer": "\n".join(lines), "citations": cites, "refused": False}
 
     # —— 9. 剂量 / 服法 / 疗程 ——
     if DOSE_Q.search(q):
         target, matched, explicit, skipped = _select_meds(q, recs)
+
+        # 问题点名了某个药：去全部档案里找它最近的一次，而不是只看最近那份记录
+        named = None if explicit else _named_med(q, recs)
+        if named:
+            med, rec = named
+            lines = [f"「{med.get('name')}」记在 {_where(rec)} 那次：", "",
+                     f"- {_med_line(med)}"]
+            if rec["id"] != last["id"]:
+                lines += ["", f"（最近一次 {fmt_date(last['visit_at'])} 的记录里没有这个药。）"]
+            lines.append("我只复述记录里的用法，不判断该不该吃、也不改剂量。")
+            return {"answer": "\n".join(lines), "citations": [cite_of(rec)], "refused": False}
         if explicit and not target:
             return _no_match(q, recs)
         if target is None:
@@ -511,8 +602,20 @@ def answer(question: str, records: list[dict]) -> dict:
             return {"answer": f"最近一次（{fmt_date(last['visit_at'])}）没有写复诊时间。\n\n"
                               f"更早的 {_where(fallback)} 记的是：{fallback['follow_up']}。",
                     "citations": [cite_of(fallback)], "refused": False}
-        return {"answer": f"记的是：{target['follow_up']}。\n\n出自 {_where(target)} 那次。",
-                "citations": [cite_of(target)], "refused": False}
+        lines = [f"记的是：{target['follow_up']}。", "", f"出自 {_where(target)} 那次。"]
+        cites = [cite_of(target)]
+        if not explicit:
+            ups = [(r, r["follow_up"]) for r in recs
+                   if r["id"] != target["id"] and r.get("follow_up")]
+            if ups:
+                lines += ["", "更早的记录里："]
+                for rec, up in ups[:3]:
+                    lines.append(f"- {fmt_date(rec['visit_at'])}：{up}")
+                for rec, _ in ups[:2]:
+                    c = cite_of(rec)
+                    if c["record_id"] not in {x["record_id"] for x in cites}:
+                        cites.append(c)
+        return {"answer": "\n".join(lines), "citations": cites, "refused": False}
 
     # —— 11. 过敏（跨记录汇总）——
     if ALLERGY_Q.search(q):
@@ -539,9 +642,29 @@ def answer(question: str, records: list[dict]) -> dict:
                               f"更早的 {_where(fallback)} 写的是：\n"
                               + "\n".join(f"- {n}" for n in fallback["notes"]),
                     "citations": [cite_of(fallback)], "refused": False}
-        return {"answer": f"{_where(target)} 医生交代的是：\n"
-                          + "\n".join(f"- {n}" for n in target["notes"]),
-                "citations": [cite_of(target)], "refused": False}
+        lines = [f"{_where(target)} 医生交代的是："]
+        lines += [f"- {n}" for n in target["notes"]]
+        cites = [cite_of(target)]
+        if not explicit:
+            seen = {str(n).strip() for n in target["notes"]}
+            older = []
+            for rec in recs:
+                if rec["id"] == target["id"]:
+                    continue
+                for n in rec.get("notes") or []:
+                    key = str(n).strip()
+                    if key and key not in seen:
+                        seen.add(key)
+                        older.append((rec, key))
+            if older:
+                lines += ["", "更早的记录里还交代过："]
+                for rec, n in older[:4]:
+                    lines.append(f"- {n}（{fmt_date(rec['visit_at'])}）")
+                for rec, _ in older[:2]:
+                    c = cite_of(rec)
+                    if c["record_id"] not in {x["record_id"] for x in cites}:
+                        cites.append(c)
+        return {"answer": "\n".join(lines), "citations": cites, "refused": False}
 
     # —— 12.5 医生说了什么：复述该次记录里的诊断、用药、复诊与注意事项 ——
     if DOCTOR_Q.search(q):

@@ -509,3 +509,66 @@ def test_asr_rejects_bad_payload(client, fresh_headers):
     big = "data:audio/webm;base64," + "A" * 12_000_001
     assert client.post("/api/ai/asr", headers=fresh_headers,
                        json={"audio": big}).status_code == 413
+
+
+# ————————————————— 跨全部档案作答 —————————————————
+def _seed_two_visits(client, headers):
+    client.post("/api/records", headers=headers, json={
+        "client_id": "cross_old", "visit_at": "2026-09-01T09:00:00+08:00",
+        "hospital": "市第一人民医院", "summary": "慢性胃炎",
+        "transcript": "9月1日诊断慢性胃炎，开奥美拉唑20mg每天一次吃14天。",
+        "meds": [{"name": "奥美拉唑", "dose": "20mg", "freq": "每天一次",
+                  "timing": "饭前", "days": "14"}],
+        "follow_up": "两周后复诊", "notes": ["少吃辣"], "mode": "manual",
+    })
+    client.post("/api/records", headers=headers, json={
+        "client_id": "cross_new", "visit_at": "2026-11-01T09:00:00+08:00",
+        "hospital": "市第二人民医院", "summary": "急性支气管炎",
+        "transcript": "11月1日诊断急性支气管炎，开阿莫西林0.5g每天两次吃7天。",
+        "meds": [{"name": "阿莫西林", "dose": "0.5g", "freq": "每天两次",
+                  "timing": "饭后", "days": "7"}],
+        "follow_up": "一周后复查", "notes": ["多喝水"], "mode": "manual",
+    })
+
+
+def test_med_history_covers_all_records(client, fresh_headers):
+    _seed_two_visits(client, fresh_headers)
+    body = client.post("/api/chat/sync", headers=fresh_headers,
+                       json={"question": "我都有什么药？"}).json()
+    assert body["refused"] is False
+    assert "阿莫西林" in body["answer"] and "奥美拉唑" in body["answer"], body["answer"]
+    assert len(body["citations"]) >= 2
+
+
+def test_general_med_answer_mentions_older_record(client, fresh_headers):
+    _seed_two_visits(client, fresh_headers)
+    body = client.post("/api/chat/sync", headers=fresh_headers,
+                       json={"question": "我开的什么药？"}).json()
+    assert "阿莫西林" in body["answer"], body["answer"]
+    assert "更早的记录里还提到" in body["answer"], body["answer"]
+    assert "奥美拉唑" in body["answer"]
+
+
+def test_dose_question_finds_drug_in_older_record(client, fresh_headers):
+    _seed_two_visits(client, fresh_headers)
+    body = client.post("/api/chat/sync", headers=fresh_headers,
+                       json={"question": "奥美拉唑怎么吃？"}).json()
+    assert body["refused"] is False
+    assert "20mg" in body["answer"] and "每天一次" in body["answer"], body["answer"]
+    assert "市第一人民医院" in body["answer"], body["answer"]
+
+
+def test_diagnosis_lists_all_records(client, fresh_headers):
+    _seed_two_visits(client, fresh_headers)
+    body = client.post("/api/chat/sync", headers=fresh_headers,
+                       json={"question": "我都有什么病？"}).json()
+    assert "急性支气管炎" in body["answer"], body["answer"]
+    assert "慢性胃炎" in body["answer"], body["answer"]
+
+
+def test_explicit_date_does_not_leak_other_records(client, fresh_headers):
+    _seed_two_visits(client, fresh_headers)
+    body = client.post("/api/chat/sync", headers=fresh_headers,
+                       json={"question": "9月1日开了什么药？"}).json()
+    assert "奥美拉唑" in body["answer"]
+    assert "阿莫西林" not in body["answer"], body["answer"]

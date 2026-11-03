@@ -543,9 +543,19 @@ body[data-view="ask"] .btn--rec{display:inline-flex}
 .timeline li{border-bottom:1px solid var(--rule)}
 .timeline li.is-flash{animation:flashRow 1.3s var(--ease-out)}
 @keyframes flashRow{0%,100%{background:transparent}18%,60%{background:var(--accent-wash)}}
+#timeline li{position:relative}
+.tl__cal{
+  position:absolute;top:10px;right:12px;z-index:2;
+  display:inline-flex;align-items:center;gap:3px;min-height:26px;padding:0 8px;
+  border:1px solid var(--accent);border-radius:var(--r-pill);background:var(--paper-2);
+  color:var(--accent-ink);font-family:var(--font-body);font-size:10px;font-weight:700;
+  cursor:pointer;white-space:nowrap;
+  transition:background var(--dur-fast),color var(--dur-fast),border-color var(--dur-fast);
+}
+.tl__cal:hover,.tl__cal:focus-visible{background:var(--accent);border-color:var(--accent);color:var(--paper-2);outline:none}
 .tl{
   display:block;width:100%;text-align:left;background:transparent;border:0;border-left:2px solid transparent;
-  padding:14px 16px;cursor:pointer;color:inherit;
+  padding:14px 120px 14px 16px;cursor:pointer;color:inherit;
   transition:background var(--dur-fast),border-color var(--dur-fast);
 }
 .tl:hover{background:rgba(var(--ink-rgb),.035)}
@@ -659,7 +669,17 @@ body[data-view="ask"] #app{height:100dvh}
   margin:0 0 10px;background:var(--paper-2);
   border:1px solid var(--rule);border-left:2px solid var(--accent);border-radius:1px;
 }
-.rec-card__hd{padding:10px 12px 9px;background:var(--accent-wash);border-bottom:1px solid var(--rule)}
+.rec-card__hd{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 12px 9px;background:var(--accent-wash);border-bottom:1px solid var(--rule)}
+.rec-card__hd-main{min-width:0;flex:1}
+.rec-card__cal{
+  display:inline-flex;align-items:center;gap:4px;flex:none;min-height:28px;padding:0 9px;
+  border:1px solid var(--accent);border-radius:var(--r-pill);background:var(--paper-2);
+  color:var(--accent-ink);font-family:var(--font-body);font-size:10.5px;font-weight:700;
+  cursor:pointer;white-space:nowrap;
+  transition:background var(--dur-fast),color var(--dur-fast),border-color var(--dur-fast);
+}
+.rec-card__cal:hover,.rec-card__cal:focus-visible{background:var(--accent);border-color:var(--accent);color:var(--paper-2);outline:none}
+.rec-card__cal svg{flex:none}
 .rec-card__date{
   display:block;font-family:var(--font-mono);font-size:10px;letter-spacing:.03em;
   color:var(--accent-ink);font-variant-numeric:tabular-nums;white-space:nowrap;
@@ -924,6 +944,26 @@ body[data-view="ask"] #app{height:100dvh}
 
 .tabbar{display:none}
 
+/* ——— 记录页：大号录音按钮（颜色跟着主题走） ——— */
+.rec-cta{
+  display:flex;align-items:center;gap:11px;width:calc(100% - 32px);margin:4px 16px 14px;
+  min-height:64px;padding:9px 16px;border-radius:10px;
+  border:1px solid var(--accent);background:var(--accent);color:var(--paper-2);
+  cursor:pointer;text-align:left;
+  box-shadow:0 12px 26px -18px rgba(var(--ink-rgb),.85);
+  transition:transform var(--dur-fast),filter var(--dur-fast),background var(--dur-fast),border-color var(--dur-fast);
+}
+.rec-cta:hover{filter:brightness(1.06)}
+.rec-cta:active{transform:translateY(1px)}
+.rec-cta:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.rec-cta__dot{width:10px;height:10px;border-radius:50%;background:currentColor;flex:none}
+.rec-cta__txt{display:grid;gap:2px;min-width:0}
+.rec-cta__k{font-family:var(--font-display);font-weight:800;font-size:23px;line-height:1.1;letter-spacing:.02em}
+.rec-cta__hint{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;opacity:.78;line-height:1.4}
+.rec-cta.is-live{background:var(--danger);border-color:var(--danger);color:#fff}
+.rec-cta.is-live .rec-cta__dot{animation:blink 1.1s infinite}
+.rec-cta:disabled{opacity:.55;cursor:not-allowed}
+
 /* ——— 询问：语音输入 ——— */
 .composer__mic{
   flex:none;width:46px;height:46px;border-radius:50%;
@@ -1028,6 +1068,11 @@ body[data-view="ask"] #app{height:100dvh}
   .home__side{min-height:78px}
   .view--home{padding:24px 16px 40px}
   .composer{padding:10px 14px 14px}
+  .rec-cta{min-height:58px;margin:2px 16px 12px;padding:8px 14px}
+  .rec-cta__k{font-size:21px}
+  .rec-card__cal{min-height:27px;padding:0 8px;font-size:10px}
+  .tl{padding-right:104px}
+  .tl__cal{min-height:25px;padding:0 7px;font-size:9.5px;right:10px;top:11px}
   .composer__mic{width:42px;height:42px}
   .composer__input{font-size:14px}
   .deer-modal{padding:16px}
@@ -1434,11 +1479,17 @@ body[data-view="ask"] #app{height:100dvh}
           <span class="meta">本次录音</span>
           <span class="live" id="liveState"><span class="rec-dot" aria-hidden="true"></span><span id="liveTxt">待机</span></span>
         </div>
-        <p class="consent" id="recConsent">开始录音前，请先征得医生与在场其他人的同意。音频由浏览器语音服务处理，可能经其云端。</p>
+        <button class="rec-cta" id="recCta" type="button" aria-pressed="false">
+          <span class="rec-cta__dot" aria-hidden="true"></span>
+          <span class="rec-cta__txt">
+            <span class="rec-cta__k" id="recCtaLabel">开始录音</span>
+            <span class="rec-cta__hint" id="recCtaHint">点一下开始，再点一下结束</span>
+          </span>
+        </button>
         <div class="panel__body">
           <p class="file-meta" id="trMeta">未开始 · 浏览器端转写</p>
           <div class="transcript" id="transcript">
-            <p class="empty">点右上「开始录音」，你说的话会一段段落在这里。识别由浏览器语音服务完成，可能经其云端。</p>
+            <p class="empty">点上面的「开始录音」，你说的话会一段段落在这里。录音会发到服务端转成文字，转写只存进你的档案。</p>
           </div>
 
           <div class="manual">
@@ -1930,6 +1981,7 @@ body[data-view="ask"] #app{height:100dvh}
     cloud: false,        // 是否已连上服务端
     saving: false,       // 归档 / 修改请求进行中
     calPending: false,   // 刚结束一次录音，等归档弹窗关闭后问日历
+    consentSeen: false,  // 本次登录是否已经看过录音同意提示
     editId: '',          // 正在修改的已归档记录
     editDraft: null,
     theme: 'warm',
@@ -2425,6 +2477,7 @@ body[data-view="ask"] #app{height:100dvh}
     state.draft = null;
     state.lines = [];
     state.chatReady = false;
+    state.consentSeen = false;
     state.ai = null;
     state.aiOn = false;
     state.aiText = '';
@@ -2584,6 +2637,7 @@ body[data-view="ask"] #app{height:100dvh}
       if (!act) return;
       var a = act.getAttribute('data-act');
       if (a === 'archive') { saveDraft(); }
+      if (a === 'cal') { addRecordToCalendar(act.getAttribute('data-id')); }
       if (a === 'del') { deleteRecord(act.getAttribute('data-id')); }
       if (a === 'edit') { openEditDialog(act.getAttribute('data-id')); }
       if (a === 'reuse') {
@@ -3488,6 +3542,14 @@ body[data-view="ask"] #app{height:100dvh}
       var medCount = (r.meds || []).length;
       return '' +
         '<li data-id="' + esc(r.id) + '">' +
+          '<button class="tl__cal" type="button" data-act="cal" data-id="' + esc(r.id) + '"' +
+            ' title="添加到日历" aria-label="把这次的复诊和用药添加到日历">' +
+            '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none"' +
+              ' stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
+              '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect>' +
+              '<path d="M8 3.5v3M16 3.5v3M3.5 10h17M12 13v5M9.5 15.5h5"></path>' +
+            '</svg>添加到日历' +
+          '</button>' +
           '<button class="tl" type="button" aria-expanded="false">' +
             '<span class="tl__date"><span>' + fmtDate(r.at) + ' ' + fmtTime(r.at) + '</span>' +
               '<span class="tl__no">第 ' + n + ' 次</span></span>' +
@@ -3758,11 +3820,21 @@ body[data-view="ask"] #app{height:100dvh}
     body.innerHTML =
       '<div class="rec-card">' +
         '<div class="rec-card__hd">' +
-          '<span class="rec-card__date">' + fmtDate(d.at) + ' ' + fmtTime(d.at) +
-            '（' + WEEK[new Date(d.at).getDay()] + '）</span>' +
-          '<b class="rec-card__ttl">' + esc(d.hospital || '未记录医院') + '</b>' +
-          '<span class="rec-card__sub">' + esc(d.summary || '未写明诊断') +
-            (panelMeds.length ? ' · ' + panelMeds.length + ' 种药' : '') + '</span>' +
+          '<div class="rec-card__hd-main">' +
+            '<span class="rec-card__date">' + fmtDate(d.at) + ' ' + fmtTime(d.at) +
+              '（' + WEEK[new Date(d.at).getDay()] + '）</span>' +
+            '<b class="rec-card__ttl">' + esc(d.hospital || '未记录医院') + '</b>' +
+            '<span class="rec-card__sub">' + esc(d.summary || '未写明诊断') +
+              (panelMeds.length ? ' · ' + panelMeds.length + ' 种药' : '') + '</span>' +
+          '</div>' +
+          '<button class="rec-card__cal" type="button" data-act="cal" data-id="' + esc(d.id) + '"' +
+            ' title="添加到日历" aria-label="把这次的复诊和用药添加到日历">' +
+            '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none"' +
+              ' stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
+              '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect>' +
+              '<path d="M8 3.5v3M16 3.5v3M3.5 10h17M12 13v5M9.5 15.5h5"></path>' +
+            '</svg>添加到日历' +
+          '</button>' +
         '</div>' +
         '<div class="rec-card__bd">' +
           /* 卡头已经写了时间/医院/诊断，这里只补那三项之外的，不重复 */
@@ -3831,6 +3903,15 @@ body[data-view="ask"] #app{height:100dvh}
     $('#recBtn').addEventListener('click', function () {
       if (state.recording) stopRec();
       else startRec();
+    });
+
+    /* 记录页大按钮：第一次点先看同意提示，看过之后直接开录 */
+    var cta = $('#recCta');
+    if (cta) cta.addEventListener('click', function () {
+      if (state.recording) { stopRec(); return; }
+      if (!canRecord()) { toast('这个浏览器不支持录音，用「手动整理」贴文字。'); return; }
+      if (state.consentSeen) { startRec(); return; }
+      showConsentModal(function () { startRec(); });
     });
 
     $('#manualGo').addEventListener('click', function () {
@@ -3965,7 +4046,7 @@ body[data-view="ask"] #app{height:100dvh}
       c.hidden = false;
       c.textContent = notes.join(' ');
     }
-    if (!SR) {
+    if (!canRecord()) {
       $('#recBtn').disabled = true;
       $('#recLabel').textContent = '不可用';
     }
@@ -3977,6 +4058,11 @@ body[data-view="ask"] #app{height:100dvh}
     el.style.height = Math.min(el.scrollHeight, 132) + 'px';
   }
 
+  /* 能录音的条件：浏览器实时识别，或能录音 + 服务端有转写 */
+  function canRecord() {
+    return !!SR || !!(window.MediaRecorder && navigator.mediaDevices && API.on);
+  }
+
   function setLive(mode) {
     var wrap = $('#liveState');
     var txt = $('#liveTxt');
@@ -3985,10 +4071,26 @@ body[data-view="ask"] #app{height:100dvh}
     else if (mode === 'ok') { wrap.classList.add('is-ok'); txt.textContent = '已转写'; }
     else { txt.textContent = '待机'; }
 
+    var ok = canRecord();
     var btn = $('#recBtn');
     btn.classList.toggle('is-live', mode === 'live');
-    /* 没有 Web Speech 时按钮是禁用的，标签必须一直说「不可用」，不能被这里改回去 */
-    $('#recLabel').textContent = !SR ? '不可用' : (mode === 'live' ? '停止录音' : '开始录音');
+    btn.disabled = !ok;
+    $('#recLabel').textContent = !ok ? '不可用' : (mode === 'live' ? '停止录音' : '开始录音');
+
+    /* 记录页的大按钮同步状态与文案 */
+    var cta = $('#recCta');
+    if (cta) {
+      var live = mode === 'live';
+      cta.classList.toggle('is-live', live);
+      cta.setAttribute('aria-pressed', live ? 'true' : 'false');
+      cta.disabled = !ok;
+      if ($('#recCtaLabel')) $('#recCtaLabel').textContent = live ? '停止录音' : '开始录音';
+      if ($('#recCtaHint')) {
+        $('#recCtaHint').textContent = !ok
+          ? '这个浏览器不支持录音，请用「手动整理」'
+          : (live ? '正在转写，点一下结束' : '点一下开始，再点一下结束');
+      }
+    }
   }
 
   function startRec() {
@@ -4237,7 +4339,7 @@ body[data-view="ask"] #app{height:100dvh}
     var box = $('#transcript');
     if (!box) return;
     if (!state.lines.length && !state.interim) {
-      box.innerHTML = '<p class="empty">点右上「开始录音」，你说的话会一段段落在这里。识别由浏览器语音服务完成，可能经其云端。</p>';
+      box.innerHTML = '<p class="empty">点上面的「开始录音」，你说的话会一段段落在这里。录音会发到服务端转成文字，转写只存进你的档案。</p>';
       return;
     }
     var html = state.lines.map(function (l) {
@@ -5763,6 +5865,7 @@ body[data-view="ask"] #app{height:100dvh}
       clearTimeout(consentTimer);
     }
     modal.classList.add('is-on');
+    state.consentSeen = true;
     clearTimeout(consentTimer);
     /* 超时也继续进入后续流程：否则用户点了「开始」，弹窗自己消失却停在首页 */
     consentTimer = setTimeout(function () {
@@ -6051,19 +6154,35 @@ body[data-view="ask"] #app{height:100dvh}
     return lines.map(icsFold).join('\r\n') + '\r\n';
   }
 
-  function downloadICS(events) {
+  function downloadICS(events, name) {
     var ics = buildICS(events);
     var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = '小鹿-复诊用药-' + fmtDate(Date.now()).replace(/\./g, '') + '.ics';
+    a.download = '小鹿-' + (name || ('复诊用药-' + fmtDate(Date.now()).replace(/\./g, ''))) + '.ics';
     document.body.appendChild(a);
     a.click();
     setTimeout(function () {
       try { URL.revokeObjectURL(url); } catch (e) {}
       if (a.parentNode) a.parentNode.removeChild(a);
     }, 1500);
+  }
+
+  /* 我的 → 某条就诊记录：只把这一条的复诊/用药写成日程 */
+  function addRecordToCalendar(id) {
+    var rec = (state.draft && state.draft.id === id) ? state.draft : null;
+    for (var i = 0; !rec && i < state.records.length; i++) {
+      if (state.records[i].id === id) { rec = state.records[i]; }
+    }
+    if (!rec) { toast('找不到这份记录，刷新后再试。'); return; }
+    var events = buildCalEvents(rec);
+    if (!events.length) {
+      toast('这份记录里没有复诊或用药时间，暂时没有可加的日程。');
+      return;
+    }
+    downloadICS(events, '复诊用药-' + fmtDate(rec.at).replace(/\./g, ''));
+    toast('日程文件已生成，打开就能加进日历。');
   }
 
   function openDeerModal() {
