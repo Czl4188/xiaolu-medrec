@@ -1,0 +1,103 @@
+/* ============================================================
+   小小 AI · 设计令牌
+   方向：处方笺档案（Editorial archive）
+   一张问诊记录被当成一份可装订、可盖章、可追源的纸本档案来对待。
+   纸不是装饰，是这个产品的隐喻：它必须能被翻回去核对。
+   ============================================================ */
+
+:root {
+  /* —— 纸与墨 —— */
+  --paper: #f2ece0;          /* 主纸色，暖白偏黄，像处方笺 */
+  --paper-2: #fbf7ee;        /* 浮起层：卡片、浮层 */
+  --paper-3: #e8e0d0;        /* 凹陷层：底纹、分隔带 */
+  --ink: #17150f;            /* 正文近黑，带暖调，不用纯黑 */
+  --ink-2: #46412f;          /* 次级文字 */
+  --muted: #6b6350;          /* 提示、元信息：与纸色调到 5:1，小字也够读 */
+  --rule: rgba(23, 21, 15, 0.16);   /* 发丝线 */
+  --rule-strong: rgba(23, 21, 15, 0.34);
+
+  /* —— 强调 —— */
+  --accent: #a6341f;         /* 印泥红：只给关键动作与印章 */
+  --accent-ink: #7d2415;
+  --accent-wash: #f3ded6;    /* 极淡底，用于标记与选中 */
+  --green: #2e5d4b;          /* 语义色：用药安全、已核验 */
+  --green-wash: #e2ebe4;
+  --amber: #8a5a12;          /* 语义色：待确认 */
+  --amber-wash: #f4e8d4;
+  --amber-ink: #5b3a0c;
+
+  /* —— 主题挂钩 ——
+     下面这些由 themes.css 按 data-theme 覆盖，
+     保证换主题时没有任何一处硬编码颜色掉落。 */
+  --ink-rgb: 23, 21, 15;             /* 供 rgba() 合成发丝线 */
+  --paper-2-rgb: 251, 247, 238;
+  --layout-line: rgba(23, 21, 15, 0.035);  /* 处方笺横线 */
+  --grain-opacity: 0.4;              /* 颗粒噪点强度 */
+  --grain-blend: multiply;           /* 浅色纸用正片叠底，深色底改用滤色 */
+  --cta-bg: #17150f;                 /* 收尾块：浅色主题是墨块 */
+  --cta-fg: #fbf7ee;
+  --cta-fg-dim: rgba(251, 247, 238, 0.72);
+  --cta-btn-bg: #fbf7ee;
+  --cta-btn-fg: #17150f;
+
+  /* 主按钮：浅色主题是墨块，深色主题由 themes.css 换成亮色 */
+  --btn-primary-bg: var(--ink);
+  --btn-primary-fg: var(--paper-2);
+  --btn-primary-hover: var(--accent);
+
+  /* —— 字体 —— */
+  /* 标题：黑体（思源黑体 → 微软雅黑 → 苹方），字重压在 700/800 */
+  --font-display: "Source Han Sans SC", "Noto Sans SC", "PingFang SC",
+                  "Microsoft YaHei", "Heiti SC", sans-serif;
+  /* 正文：宋体（思源宋体 → 宋体-简 → SimSun），中文书刊的正文面孔 */
+  --font-body: "Source Han Serif SC", "Noto Serif SC", "Songti SC",
+               "SimSun", "STSong", Georgia, serif;
+  /* 数据：等宽，日期、剂量、档案号必须对齐 */
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", "Cascadia Mono",
+               Consolas, "Courier New", monospace;
+  /* 批注：手写感，用于旁注与页边 */
+  --font-hand: "Kaiti SC", "KaiTi", "STKaiti", "Kaiti TC", serif;
+
+  /* —— 字阶（1.25 比例，收敛为 7 档）—— */
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-base: 15px;
+  --fs-md: 17px;
+  --fs-lg: 22px;
+  --fs-xl: 30px;
+  --fs-2xl: 42px;
+  --fs-3xl: clamp(40px, 5.6vw, 76px);
+
+  /* —— 间距梯度 —— */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 40px;
+  --sp-7: 64px;
+  --sp-8: 96px;
+  --sp-9: 140px;
+
+  /* —— 形状：档案纸是裁切的，几乎不圆 —— */
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 6px;
+  --r-pill: 999px;
+
+  /* —— 阴影：只做纸张叠放的高度，不做发光 —— */
+  --shadow-1: 0 1px 0 rgba(23, 21, 15, 0.06);
+  --shadow-2: 0 2px 0 rgba(23, 21, 15, 0.05), 0 10px 24px -14px rgba(23, 21, 15, 0.4);
+  --shadow-3: 0 24px 56px -28px rgba(23, 21, 15, 0.55);
+
+  /* —— 动效 —— */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 160ms;
+  --dur-base: 320ms;
+  --dur-slow: 640ms;
+
+  /* —— 版心 —— */
+  --measure: 1160px;
+  --gutter: clamp(20px, 5vw, 72px);
+}

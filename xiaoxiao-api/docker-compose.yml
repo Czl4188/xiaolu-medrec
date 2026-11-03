@@ -1,0 +1,79 @@
+"""本地/预发布用的多容器编排。
+
+两个 API 实例 + 两个 Worker + PostgreSQL + Redis，对应架构文档 §7 的拓扑。
+生产把 postgres/redis 换成云托管服务，只改 DATABASE_URL / REDIS_URL 即可。
+
+    docker compose up --build
+    docker compose exec api alembic upgrade head
+"""
+
+x-api-common: &api-common
+  build: .
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://medrec:medrec@postgres:5432/medrec
+    REDIS_URL: redis://redis:6379/0
+    APP_ENV: prod
+    SECRET_KEY: ${SECRET_KEY:?请在 .env 里设置 SECRET_KEY}
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: medrec
+      POSTGRES_PASSWORD: medrec
+      POSTGRES_DB: medrec
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medrec -d medrec"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *api-common
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/readyz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  api-2:
+    <<: *api-common
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+
+  worker:
+    <<: *api-common
+    command: python -m app.worker.run
+
+  worker-2:
+    <<: *api-common
+    command: python -m app.worker.run
+
+volumes:
+  pgdata:
+  redisdata:

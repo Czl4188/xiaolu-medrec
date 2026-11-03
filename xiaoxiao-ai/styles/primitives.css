@@ -1,0 +1,98 @@
+/* ============================================================
+   公共原件：两页共用的按钮、标签、文字链
+   落地页与工作台都引用本文件，避免各写一套。
+   ============================================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) ease-out,
+    color var(--dur-fast) ease-out,
+    border-color var(--dur-fast) ease-out,
+    transform var(--dur-fast) ease-out;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { cursor: not-allowed; opacity: 0.55; transform: none; }
+
+.btn--primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  border-color: var(--btn-primary-bg);
+}
+.btn--primary:hover:not(:disabled) {
+  background: var(--btn-primary-hover);
+  border-color: var(--btn-primary-hover);
+}
+
+.btn--ghost { border-color: var(--rule-strong); color: var(--ink-2); }
+.btn--ghost:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+
+.btn__key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-xs);
+}
+
+/* 文字链：下划线扫过，不做成按钮 */
+.link-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+  border-bottom: 1px solid var(--rule-strong);
+  padding-bottom: 2px;
+  min-height: 32px;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+.link-arrow:hover { border-color: var(--accent); color: var(--accent); }
+.link-arrow span { transition: transform var(--dur-fast) var(--ease-out); }
+.link-arrow:hover span { transform: translateX(3px); }
+
+/* 来源标签：等宽小字，像档案的索引签 */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  background: var(--paper);
+  white-space: nowrap;
+}
+.tag--src { border-color: var(--accent); color: var(--accent); }
+.tag--ok { border-color: var(--green); color: var(--green); background: var(--green-wash); }
+
+/* 等宽行内：档案号、日期、剂量必须对齐，混在正文里也不能跳字体 */
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}

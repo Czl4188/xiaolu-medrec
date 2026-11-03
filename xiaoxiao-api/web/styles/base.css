@@ -1,0 +1,177 @@
+/* ============================================================
+   基础层：重置、排版、纸面质感、焦点与降级动效
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  line-height: 1.85;
+  letter-spacing: 0.012em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* 纸面：横向细线（处方笺）+ 颗粒噪点 + 极淡的边角霉斑
+   三层叠在一起，才压得住「屏幕感」 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 27px,
+      var(--layout-line) 27px 28px
+    );
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E");
+}
+
+/* 页面内容必须浮在纸纹之上 */
+.page { position: relative; z-index: 1; }
+
+/* —— 排版 —— */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+  margin: 0;
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--fs-3xl); }
+h2 { font-size: var(--fs-2xl); }
+h3 { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.01em; }
+h4 { font-size: var(--fs-md); font-weight: 700; letter-spacing: 0; line-height: 1.4; }
+
+p { margin: 0 0 1.1em; max-width: 34em; }
+p:last-child { margin-bottom: 0; }
+
+a { color: inherit; text-decoration: none; }
+
+strong { font-weight: 700; }
+em { font-style: normal; color: var(--accent); }
+
+ul, ol { margin: 0; padding: 0; list-style: none; }
+
+img { max-width: 100%; display: block; }
+
+/* —— 元信息：等宽小字，档案的页眉习惯 —— */
+.meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.hand {
+  font-family: var(--font-hand);
+  font-size: var(--fs-base);
+  color: var(--ink-2);
+  letter-spacing: 0.03em;
+}
+
+/* —— 发丝线 —— */
+.rule { height: 1px; background: var(--rule); border: 0; margin: 0; }
+.rule--strong { background: var(--rule-strong); }
+
+/* —— 焦点：2px 描边 + 2px 偏移，必须看得见 —— */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* —— 跳过导航 —— */
+.skip {
+  position: absolute;
+  left: var(--gutter);
+  top: -100px;
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+}
+.skip:focus { top: 12px; }
+
+/* —— 屏幕阅读器专用 —— */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* —— 入场序列：一次编排，错峰 80ms ——
+   只有脚本确实跑起来了才隐藏内容；JS 失效时页面必须完整可读 */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+}
+.js .reveal.in {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+}
+.js .reveal:nth-child(2) { transition-delay: 80ms; }
+.js .reveal:nth-child(3) { transition-delay: 160ms; }
+.js .reveal:nth-child(4) { transition-delay: 240ms; }
+.js .reveal:nth-child(5) { transition-delay: 320ms; }
+
+/* —— 降级：用户要求减少动效时，全部关掉 —— */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .js .reveal { opacity: 1; transform: none; }
+}
+
+/* —— 选中态：用印泥淡色，不用系统蓝 —— */
+::selection { background: var(--accent-wash); color: var(--accent-ink); }
+
+/* —— 滚动条：细，灰 —— */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--ink-rgb), 0.18);
+  border: 3px solid var(--paper);
+  border-radius: var(--r-pill);
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(var(--ink-rgb), 0.3); }

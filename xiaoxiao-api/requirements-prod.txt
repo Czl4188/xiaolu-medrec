@@ -1,0 +1,4 @@
+-r requirements.txt
+# 生产额外依赖：PostgreSQL 驱动、Redis 客户端
+psycopg[binary]>=3.2
+redis>=5.0

@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+.env
+.pytest_cache/
+dist/
+dist.env
+dist.secret.key

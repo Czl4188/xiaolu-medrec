@@ -1,0 +1,38 @@
+# ————— 依赖与构建产物 —————
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+dist/
+build/
+
+# ————— 密钥与本地数据：绝对不要提交 —————
+.env
+.env.local
+.env.*.local
+config.env
+*.key
+*.pem
+data/
+*.db
+*.sqlite3
+
+# 示例配置需要保留
+!.env.example
+
+# ————— 工具与系统文件 —————
+.workbuddy/
+.wbapp_*.genie
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ————— 临时测试探针 —————
+xiaoxiao-ai/_*.html
+xiaoxiao-api/web/_*.html

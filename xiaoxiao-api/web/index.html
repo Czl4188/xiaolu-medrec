@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小鹿 · 把一次会诊，记成一份能问的档案</title>
+<meta name="description" content="录下问诊，小鹿 实时转成文字、抽取诊断与用药、存成按账号隔离的病历记录；之后只凭记录回答，每条标注来源。">
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/primitives.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/themes.css">
+<script src="scripts/theme.js"></script>
+<script>document.documentElement.className += " js";</script>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+
+<div class="page">
+
+  <!-- 页眉：档案抬头 -->
+  <header class="masthead">
+    <div class="brand">
+      <span class="brand__name">小鹿</span>
+      <span class="brand__slash">/</span>
+      <span class="brand__sub">病历记录智能体 · v1.0</span>
+    </div>
+    <nav class="nav" aria-label="主导航">
+      <a href="#how">它怎么记</a>
+      <a href="#record">档案字段</a>
+      <a href="#boundary">依据与边界</a>
+      <a href="app.html" class="btn btn--primary" style="min-height:38px;padding:0 16px;">打开工作台</a>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <!-- ———— 首屏 ———— -->
+    <section class="hero">
+      <div class="hero__grid">
+
+        <div class="hero__copy">
+          <div class="hero__kicker reveal">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="meta">mp3 / wav / m4a → 转写 → 结构化病历 → 按档案作答</span>
+          </div>
+
+          <h1 class="reveal">
+            问诊说完，
+            <span class="break">记忆<em>留下</em>。</span>
+          </h1>
+
+          <p class="hero__lede reveal">
+            医生说的那十分钟，出门就忘了大半：药名记不住，饭前饭后记不清，复查是哪天也想不起来。
+            你把会诊录音交给小鹿，它转成原文、抽成一份标准病历 —— 诊断、药品、剂量、服法、复诊日，
+            存进你专属的档案夹。之后你问它，它只从这份档案里找答案，并告诉你这句出自哪一次就诊。
+          </p>
+
+          <div class="hero__actions reveal">
+            <a class="btn btn--primary" href="app.html">打开工作台<span aria-hidden="true">↗</span></a>
+            <a class="link-arrow" href="#how">看它怎么记 <span aria-hidden="true">↓</span></a>
+          </div>
+
+          <dl class="hero__facts reveal">
+            <div>
+              <dt class="fact__k">采集</dt>
+              <dd class="fact__v" style="margin:0">现场一键录音</dd>
+            </div>
+            <div>
+              <dt class="fact__k">存档</dt>
+              <dd class="fact__v" style="margin:0">一人一档，JSON</dd>
+            </div>
+            <div>
+              <dt class="fact__k">作答</dt>
+              <dd class="fact__v" style="margin:0">只引档案，不猜</dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- 病历档案样张：整个页面的记忆点 -->
+        <div class="hero__aside reveal">
+          <div class="paper-stack" aria-label="病历档案样张">
+          <article class="sheet">
+            <div class="sheet__head">
+              <span class="sheet__ttl">病历档案</span>
+              <span class="sheet__no">林小满<br>v_20260831_01</span>
+            </div>
+
+            <div class="rec">
+              <div class="rec__row">
+                <span class="rec__k">就诊时间</span>
+                <span class="rec__v mono">2026-08-31 10:20</span>
+              </div>
+              <div class="rec__row">
+                <span class="rec__k">医院 · 科室</span>
+                <span class="rec__v">上海瑞金医院 · 消化内科</span>
+              </div>
+              <div class="rec__row">
+                <span class="rec__k">诊断</span>
+                <span class="rec__v">慢性胃炎伴糜烂；幽门螺杆菌感染</span>
+              </div>
+              <div class="rec__row">
+                <span class="rec__k">过敏史</span>
+                <span class="rec__v">青霉素类</span>
+              </div>
+              <div class="rec__row rec__row--stack">
+                <span class="rec__k">用药 · 4 种 / 14 天</span>
+                <span class="rec__v">
+                  艾司奥美拉唑镁肠溶片 <b class="mono">20 mg</b> 早晚餐前 30 分钟<br>
+                  枸橼酸铋钾胶囊 <b class="mono">220 mg</b> 早晚餐前 30 分钟<br>
+                  克拉霉素片 <b class="mono">500 mg</b> 早晚餐后 30 分钟<br>
+                  甲硝唑片 <b class="mono">400 mg</b> 早晚餐后 30 分钟
+                </span>
+              </div>
+              <div class="rec__row">
+                <span class="rec__k">复诊</span>
+                <span class="rec__v mono">2026-09-05 · 消化内科门诊</span>
+              </div>
+              <div class="rec__row">
+                <span class="rec__k">注意事项</span>
+                <span class="rec__v">忌酒、浓茶、辛辣；停药满 4 周复查呼气试验</span>
+              </div>
+            </div>
+
+            <div class="sheet__sign">
+              <span class="stamp" aria-hidden="true">
+                <span>已归档</span>
+                <span>08.31</span>
+              </span>
+            </div>
+          </article>
+          </div>
+
+          <p class="hero__note">
+            这不是截图，是它实际写进<br>
+            <span class="mono">visits/v_20260831_01.json</span> 的内容。
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ———— 01 流程 ———— -->
+    <section class="section" id="how">
+      <div class="section__inner">
+        <div class="sec-head">
+          <span class="sec-head__no">01<br>WORKFLOW</span>
+          <div>
+            <h2>五步，从一段录音到一份档案。</h2>
+            <p class="sec-head__sub">
+              它不陪着聊天，它负责把这次会诊钉在纸上。
+              你只需要做一件事：按下「开始」。
+            </p>
+          </div>
+        </div>
+
+        <ol class="flow">
+          <li class="flow__item">
+            <span class="flow__no">01</span>
+            <div>
+              <div class="flow__ttl">录音</div>
+            </div>
+            <p class="flow__desc">
+              在手机上或电脑前按下「开始录音」，浏览器边听边转。音频不出这台设备，只留文字。
+              没有麦克风、或者当时忘了录，把问诊内容贴进输入框，一样能整理成记录。
+            </p>
+          </li>
+
+          <li class="flow__item">
+            <span class="flow__no">02</span>
+            <div>
+              <div class="flow__ttl">转写</div>
+            </div>
+            <p class="flow__desc">
+              浏览器自带的语音识别实时落字，带时间戳。口语照原样留着，不改写、不润色；
+              它不区分说话人，药名剂量也可能听错 —— 关键的对着处方再核一遍。
+            </p>
+          </li>
+
+          <li class="flow__item">
+            <span class="flow__no">03</span>
+            <div>
+              <div class="flow__ttl">抽取</div>
+            </div>
+            <p class="flow__desc">
+              从原文里抽出就诊时间、医院、诊断、过敏史、药品与剂量、饭前还是饭后、
+              疗程几天、哪天复诊、忌口什么。抽不到的字段留空，并当面告诉你哪几项没抽到。
+            </p>
+          </li>
+
+          <li class="flow__item">
+            <span class="flow__no">04</span>
+            <div>
+              <div class="flow__ttl">归档</div>
+            </div>
+            <p class="flow__desc">
+              先给你看一遍，你点头才写入。一次就诊一条记录，连同原始转写一起存进这台设备，
+              关掉浏览器再打开，它还在。
+            </p>
+          </li>
+
+          <li class="flow__item">
+            <span class="flow__no">05</span>
+            <div>
+              <div class="flow__ttl">作答</div>
+            </div>
+            <p class="flow__desc">
+              上一次是哪天、今天吃什么、饭前还是饭后、什么时候复诊 ——
+              它翻你的档案回答，每条都标出取自哪一次就诊；档案里没有，就说没有。
+            </p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ———— 02 档案字段 ———— -->
+    <section class="section" id="record">
+      <div class="section__inner">
+        <div class="sec-head">
+          <span class="sec-head__no">02<br>RECORD</span>
+          <div>
+            <h2>一份档案，就这几个字段。</h2>
+            <p class="sec-head__sub">
+              字段是固定的，内容全部来自那次对话。缺就留空 —— 一份诚实的空档案，
+              好过一份看起来很完整的假档案。
+            </p>
+          </div>
+        </div>
+
+        <div class="fields">
+          <div class="fields__row">
+            <span class="fields__k mono">account</span>
+            <span class="fields__d">登录账号。一人一个，读写只落在自己的键下，换个人登录看不到。</span>
+            <span class="fields__t">林小满</span>
+          </div>
+          <div class="fields__row">
+            <span class="fields__k mono">visit_time</span>
+            <span class="fields__d">就诊时间。统一 ISO 格式，只有日期时精确到日。</span>
+            <span class="fields__t mono">2026-08-31T10:20+08:00</span>
+          </div>
+          <div class="fields__row">
+            <span class="fields__k mono">hospital</span>
+            <span class="fields__d">医院与科室。对话里没提就留空，不按常识补。</span>
+            <span class="fields__t">上海瑞金医院 · 消化内科</span>
+          </div>
+          <div class="fields__row">
+            <span class="fields__k mono">diagnosis</span>
+            <span class="fields__d">诊断结果。照医生原话，多个诊断拆成数组。</span>
+            <span class="fields__t">慢性胃炎伴糜烂；幽门螺杆菌感染</span>
+          </div>
+          <div class="fields__row">
+            <span class="fields__k mono">allergy</span>
+            <span class="fields__d">过敏史。医生问过、患者答过，才算记录在案。</span>
+            <span class="fields__t">青霉素类</span>
+          </div>
+          <div class="fields__row">
+            <span class="fields__k mono">medicines[]</span>
+            <span class="fields__d">药品数组：名称、剂量、频次、饭前/饭后、疗程天数，逐项独立抽取。</span>
+            <span class="fields__t">4 项 · 见上卡</span>
+          </div>
+          <div class="fields__row">
+            <span class="fields__k mono">follow_up</span>
+            <span class="fields__d">复诊时间与科室。相对说法（"两周后"）按就诊日换算，原话保留。</span>
+            <span class="fields__t mono">2026-09-05</span>
+          </div>
+          <div class="fields__row">
+            <span class="fields__k mono">notes</span>
+            <span class="fields__d">注意事项。照录医生原话，不归纳成"建议"。</span>
+            <span class="fields__t">忌酒、浓茶、辛辣</span>
+          </div>
+        </div>
+
+        <p class="fields__foot">
+          每条字段还带一条 <span class="mono">evidence</span>：原文那一句 + 时间戳。
+          点开就能听到／看到医生当时是怎么说的。
+        </p>
+
+        <div class="examples">
+
+          <!-- 问题一：时间与诊断 -->
+          <article class="memcard">
+            <p class="memcard__q">小鹿，我上次看病是什么时候？</p>
+            <div class="memcard__a">
+              <p>
+                <span class="hl">2026 年 8 月 31 日</span>上午，上海瑞金医院 · 消化内科。
+                诊断是<span class="hl">慢性胃炎伴糜烂</span>、幽门螺杆菌感染。
+              </p>
+              <p style="color:var(--ink-2);font-size:var(--fs-sm);margin-top:12px;">
+                往前还有两次：6 月 2 日社区卫生服务中心开过铝碳酸镁；
+                2025 年 11 月 14 日做过胃镜，当时是慢性浅表性胃炎。
+              </p>
+            </div>
+            <div class="memcard__srcs">
+              <span class="tag tag--src">2026-08-31 · v_20260831_01</span>
+              <span class="tag">2026-06-02</span>
+              <span class="tag">2025-11-14</span>
+            </div>
+          </article>
+
+          <!-- 问题二：今天吃什么药 -->
+          <article class="memcard memcard--tall">
+            <p class="memcard__q">那我今天要吃什么药？</p>
+            <div class="memcard__a">
+              <p>
+                今天是 <span class="hl">9 月 3 日</span>，按 8 月 31 日那份档案的 14 天疗程，
+                是<span class="hl">第 3 天</span>。档案里记的是：
+              </p>
+
+              <table class="rx">
+                <thead>
+                  <tr>
+                    <th scope="col">药品</th>
+                    <th scope="col">单次剂量</th>
+                    <th scope="col">服法</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>艾司奥美拉唑镁肠溶片</td>
+                    <td class="dose">20 mg</td>
+                    <td class="when">早、晚餐前 30 分钟</td>
+                  </tr>
+                  <tr>
+                    <td>枸橼酸铋钾胶囊</td>
+                    <td class="dose">220 mg</td>
+                    <td class="when">早、晚餐前 30 分钟</td>
+                  </tr>
+                  <tr>
+                    <td>克拉霉素片</td>
+                    <td class="dose">500 mg</td>
+                    <td class="when">早、晚餐后 30 分钟</td>
+                  </tr>
+                  <tr>
+                    <td>甲硝唑片</td>
+                    <td class="dose">400 mg</td>
+                    <td class="when">早、晚餐后 30 分钟</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;align-items:center;">
+                <span class="tag tag--ok">档案内过敏史已核对</span>
+                <span class="hand" style="font-size:var(--fs-sm);">它只复述这四条，不判断该不该吃、也不改剂量。</span>
+              </div>
+            </div>
+            <div class="memcard__srcs">
+              <span class="tag tag--src">2026-08-31 · medicines[]</span>
+              <span class="tag tag--src">patient.allergy</span>
+              <span class="tag">疗程按 visit_time 推算</span>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ———— 03 依据与边界 ———— -->
+    <section class="section" id="boundary">
+      <div class="section__inner">
+        <div class="sec-head">
+          <span class="sec-head__no">03<br>BOUNDARY</span>
+          <div>
+            <h2>它不是医生，也装不成医生。</h2>
+            <p class="sec-head__sub">
+              医疗场景里，最危险的不是答错，是答得像对的。所以它给自己立了三条硬规矩。
+            </p>
+          </div>
+        </div>
+
+        <div class="kb">
+          <div class="kb__col">
+            <span class="kb__no">A</span>
+            <h4>只答档案里有的</h4>
+            <p>
+              每条答案必须能翻到某一次就诊的某个字段。翻不到，它就回一句
+              「病历档案未查询到该内容，无法回答」，然后建议你复诊时问医生。
+            </p>
+          </div>
+          <div class="kb__col">
+            <span class="kb__no">B</span>
+            <h4>出处必须指到那次就诊</h4>
+            <p>
+              答案后面永远跟着来源：日期、医院、科室、档案号。
+              两次就诊说法不同时，它分开列出，不替你把它们揉成一个结论。
+            </p>
+          </div>
+          <div class="kb__col">
+            <span class="kb__no">C</span>
+            <h4>处方权在医生手里</h4>
+            <p>
+              它只复述你已经拿到的处方，不新增药、不改剂量、不判断该不该停药。
+              这类问题一律转成「下次复诊时问医生」。
+            </p>
+          </div>
+        </div>
+
+        <div class="warn-block">
+          <strong>每次回答的末尾</strong>
+          <p style="margin:0">
+            固定带一句：本内容仅为病历档案整理，不能替代医生诊疗意见。
+            页面里的患者、医院、处方都是构造的样例，只用于演示档案结构与检索方式。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ———— 04 隔离 ———— -->
+    <section class="section">
+      <div class="section__inner">
+        <div class="sec-head">
+          <span class="sec-head__no">04<br>ISOLATION</span>
+          <div>
+            <h2>一个人一份档案，彼此看不见。</h2>
+          </div>
+        </div>
+
+        <div class="privacy">
+          <div class="privacy__list">
+            <div class="privacy__item">
+              <span class="privacy__mark">01</span>
+              <div>
+                <div class="privacy__t">一人一个账号</div>
+                <p class="privacy__d">
+                  资料与记录都存在 <span class="mono">lx_records_v1_账号</span> 这个键下，
+                  各存各的。没登录进不来，登进来也只读得到自己那一份。
+                </p>
+              </div>
+            </div>
+            <div class="privacy__item">
+              <span class="privacy__mark">02</span>
+              <div>
+                <div class="privacy__t">一个账号一条时间线</div>
+                <p class="privacy__d">
+                  同一个账号可以存很多次就诊，按时间摞成一条线，全在「我的」里；
+                  换个人登录，就是另一条干净的线。
+                </p>
+              </div>
+            </div>
+            <div class="privacy__item">
+              <span class="privacy__mark">03</span>
+              <div>
+                <div class="privacy__t">别高估「本地」</div>
+                <p class="privacy__d">
+                  转写用的是浏览器自带识别，音频可能被发送到浏览器厂商的云端——本页保证不了「声音不出设备」。
+                  存下来的是文字：服务端模式下进你的账号，本机模式下在浏览器里。
+                  不想要哪一条，在「我的」里点删除。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p style="font-size:var(--fs-xl);line-height:1.5;font-family:var(--font-display);font-weight:700;letter-spacing:-0.015em;">
+              一句实话：<br>本机账号不是服务器鉴权。
+            </p>
+            <p style="color:var(--ink-2);margin-top:16px;">
+              登录只是把数据按账号分开存，密码也只在本机校验；它挡不住能打开这台电脑的人，
+              也挡不住清空浏览器数据 —— 清掉就没了。真要长期保存，得自己导出或接后端。
+            </p>
+            <a class="link-arrow" href="app.html" style="margin-top:8px;">进工作台试一遍 <span aria-hidden="true">→</span></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ———— 收尾 ———— -->
+    <section class="cta">
+      <div class="cta__inner">
+        <div>
+          <h2>下一次复诊前，<br>先把这次的问诊录下来。</h2>
+          <p>登录后录一次，回头就能问「上次什么时候」「今天吃什么药」——答案只来自你自己的记录。</p>
+        </div>
+        <a class="btn" href="app.html">打开工作台<span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <span class="meta">小鹿 · 病历记录智能体 · 演示版</span>
+      <span class="meta">现场录音 · 一人一档 · 作答留痕 · 不构成诊疗建议</span>
+      <span class="meta">— 01 —</span>
+    </div>
+  </footer>
+
+</div>
+
+<script src="scripts/main.js"></script>
+
+<script>
+/* 部署后整站受 sharecode 保护，站内跳转必须把访问参数带过去，
+   否则点「打开工作台」会落到「链接不完整」。 */
+(function () {
+  var q = location.search;
+  if (!q) return;
+  var links = document.querySelectorAll('a[href]');
+  for (var i = 0; i < links.length; i++) {
+    var a = links[i];
+    var h = a.getAttribute('href');
+    if (!h || /^(https?:)?\/\//.test(h) || h.charAt(0) === '#') continue;
+    if (h.indexOf('.html') === -1) continue;
+    a.setAttribute('href', h + (h.indexOf('?') > -1 ? '&' : '?') + q.slice(1));
+  }
+})();
+</script>
+</body>
+</html>

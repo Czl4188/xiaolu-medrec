@@ -1,0 +1,329 @@
+/* ============================================================
+   主题层 · 五套纸质
+   版式、字阶、栅格一律不动，只换「纸、墨、印」三样东西。
+   一套好的主题不该改结构，只该改光线。
+   ============================================================ */
+
+/* ————————————————————————————————
+   01 处方笺 · 暖纸 + 印泥红
+   最像纸档案的一套。红章是唯一的高音。
+   ———————————————————————————————— */
+html[data-theme="rx"] {
+  --paper: #f2ece0;
+  --paper-2: #fbf7ee;
+  --paper-3: #e8e0d0;
+  --ink: #17150f;
+  --ink-2: #46412f;
+  --muted: #6b6350;
+  --rule: rgba(23, 21, 15, 0.16);
+  --rule-strong: rgba(23, 21, 15, 0.34);
+
+  --accent: #a6341f;
+  --accent-ink: #7d2415;
+  --accent-wash: #f3ded6;
+  --green: #2e5d4b;
+  --green-wash: #e2ebe4;
+  --amber: #8a5a12;
+  --amber-wash: #f4e8d4;
+  --amber-ink: #5b3a0c;
+
+  --ink-rgb: 23, 21, 15;
+  --paper-2-rgb: 251, 247, 238;
+  --layout-line: rgba(23, 21, 15, 0.035);
+  --grain-opacity: 0.4;
+  --grain-blend: multiply;
+
+  --cta-bg: #17150f;
+  --cta-fg: #fbf7ee;
+  --cta-fg-dim: rgba(251, 247, 238, 0.72);
+  --cta-btn-bg: #fbf7ee;
+  --cta-btn-fg: #17150f;
+}
+
+/* ————————————————————————————————
+   02 药房 · 米灰纸 + 松墨绿
+   抓药窗口的那本册子。绿章表示合格，不是警示。
+   比第一套冷半度，适合长时间看处方。
+   ———————————————————————————————— */
+html[data-theme="herb"] {
+  --paper: #eae9dc;
+  --paper-2: #f7f6ec;
+  --paper-3: #dcdbca;
+  --ink: #16211a;
+  --ink-2: #3d4b41;
+  --muted: #59665c;
+  --rule: rgba(22, 33, 26, 0.16);
+  --rule-strong: rgba(22, 33, 26, 0.32);
+
+  --accent: #1e5c42;
+  --accent-ink: #14442f;
+  --accent-wash: #dbe6da;
+  --green: #2f7a55;
+  --green-wash: #dbe8db;
+  --amber: #7d5716;
+  --amber-wash: #efe4cd;
+  --amber-ink: #52390d;
+
+  --ink-rgb: 22, 33, 26;
+  --paper-2-rgb: 247, 246, 236;
+  --layout-line: rgba(22, 33, 26, 0.032);
+  --grain-opacity: 0.42;
+  --grain-blend: multiply;
+
+  --cta-bg: #16211a;
+  --cta-fg: #f7f6ec;
+  --cta-fg-dim: rgba(247, 246, 236, 0.7);
+  --cta-btn-bg: #f7f6ec;
+  --cta-btn-fg: #16211a;
+}
+
+/* ————————————————————————————————
+   03 医典 · 冷白纸 + 藏青公章 + 铜版线
+   像一本内页带铜版插图的教科书。蓝章是院方权威，
+   琥珀只留给「待确认」。最克制的一套。
+   ———————————————————————————————— */
+html[data-theme="codex"] {
+  --paper: #eceff2;
+  --paper-2: #f8fafb;
+  --paper-3: #dde3e7;
+  --ink: #121a22;
+  --ink-2: #33424f;
+  --muted: #59656f;
+  --rule: rgba(18, 26, 34, 0.16);
+  --rule-strong: rgba(18, 26, 34, 0.32);
+
+  --accent: #1d4e79;
+  --accent-ink: #143a5c;
+  --accent-wash: #dde7f0;
+  --green: #2b6b6a;
+  --green-wash: #dbe7e6;
+  --amber: #8a5a12;
+  --amber-wash: #f2e7d2;
+  --amber-ink: #5b3a0c;
+
+  --ink-rgb: 18, 26, 34;
+  --paper-2-rgb: 248, 250, 251;
+  --layout-line: rgba(18, 26, 34, 0.032);
+  --grain-opacity: 0.34;
+  --grain-blend: multiply;
+
+  --cta-bg: #121a22;
+  --cta-fg: #f8fafb;
+  --cta-fg-dim: rgba(248, 250, 251, 0.7);
+  --cta-btn-bg: #f8fafb;
+  --cta-btn-fg: #121a22;
+}
+
+/* ————————————————————————————————
+   04 值守 · 墨底 + 冷青
+   夜里值班室那台显示器。深色不等于是暗黑风：
+   底色是带绿的墨，不是纯黑；字是冷白，不是亮白。
+   正文换成无衬线，小字在暗底上更立得住。
+   ———————————————————————————————— */
+html[data-theme="night"] {
+  --paper: #12161a;
+  --paper-2: #1a2027;
+  --paper-3: #0c0f12;
+  --ink: #e6ecef;
+  --ink-2: #b3bdc5;
+  --muted: #8f9aa3;
+  --rule: rgba(230, 236, 239, 0.14);
+  --rule-strong: rgba(230, 236, 239, 0.3);
+
+  --accent: #5cb2d8;
+  --accent-ink: #8ccde8;
+  --accent-wash: #16262f;
+  --green: #6bbf95;
+  --green-wash: #14281f;
+  --amber: #d9a44e;
+  --amber-wash: #2b2214;
+  --amber-ink: #ecc689;
+
+  --ink-rgb: 230, 236, 239;
+  --paper-2-rgb: 26, 32, 39;
+  --layout-line: rgba(230, 236, 239, 0.045);
+  --grain-opacity: 0.5;
+  --grain-blend: screen;
+
+  --cta-bg: #1d2830;
+  --cta-fg: #e6ecef;
+  --cta-fg-dim: rgba(230, 236, 239, 0.68);
+  --cta-btn-bg: #e6ecef;
+  --cta-btn-fg: #12161a;
+
+  /* 深色底上白块太跳，主按钮改用青色 + 深字 */
+  --btn-primary-bg: var(--accent);
+  --btn-primary-fg: #0b1014;
+  --btn-primary-hover: var(--accent-ink);
+
+  --font-body: "Source Han Sans SC", "Noto Sans SC", "PingFang SC",
+               "Microsoft YaHei", "Heiti SC", sans-serif;
+  --font-hand: "Kaiti SC", "KaiTi", "STKaiti", serif;
+}
+
+/* ————————————————————————————————
+   05 无菌 · 近白 + 石墨 + 医用青
+   没有纸味，像一台设备的操作面。颗粒压到最低，
+   字全部无衬线。最「现代」的一套，也最不容易出错。
+   ———————————————————————————————— */
+html[data-theme="sterile"] {
+  --paper: #eef1f2;
+  --paper-2: #ffffff;
+  --paper-3: #e2e7e8;
+  --ink: #0d1214;
+  --ink-2: #39434a;
+  --muted: #646e74;
+  --rule: rgba(13, 18, 20, 0.13);
+  --rule-strong: rgba(13, 18, 20, 0.28);
+
+  --accent: #0c6e68;
+  --accent-ink: #08514d;
+  --accent-wash: #d9eae8;
+  --green: #1f7350;
+  --green-wash: #dcebe2;
+  --amber: #8a5a12;
+  --amber-wash: #f4e8d4;
+  --amber-ink: #5b3a0c;
+
+  --ink-rgb: 13, 18, 20;
+  --paper-2-rgb: 255, 255, 255;
+  --layout-line: rgba(13, 18, 20, 0.03);
+  --grain-opacity: 0.18;
+  --grain-blend: multiply;
+
+  --cta-bg: #0d1214;
+  --cta-fg: #f4f6f6;
+  --cta-fg-dim: rgba(244, 246, 246, 0.7);
+  --cta-btn-bg: #f4f6f6;
+  --cta-btn-fg: #0d1214;
+
+  --font-body: "Source Han Sans SC", "Noto Sans SC", "PingFang SC",
+               "Microsoft YaHei", "Heiti SC", sans-serif;
+}
+
+/* ————————————————————————————————
+   主题切换器 · 右下角常驻
+   只在两页都出现，不抢内容。收起时只是一排色点。
+   ———————————————————————————————— */
+.themer {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 90;
+  /* 固定宽度：fixed + 内容自适应会把面板压窄，挤坏网格 */
+  width: 232px;
+  pointer-events: none;
+  font-family: var(--font-display);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.themer__toggle {
+  pointer-events: auto;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: var(--shadow-2);
+}
+.themer__toggle:hover { border-color: var(--ink); }
+.themer__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  border: 1px solid var(--rule-strong);
+  flex: none;
+}
+.themer__panel {
+  pointer-events: auto;
+  display: none;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-3);
+}
+.themer[data-open="true"] .themer__panel { display: block; }
+.themer__hd {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 6px;
+}
+.themer__opt {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.themer__opt:hover { background: rgba(var(--ink-rgb), 0.06); }
+.themer__opt[aria-pressed="true"] { background: var(--accent-wash); }
+.themer__chip {
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  border: 1px solid var(--rule-strong);
+  position: relative;
+  overflow: hidden;
+}
+.themer__chip::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50% 0 0 0;
+  background: var(--chip-accent, transparent);
+}
+.themer__more {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 6px 4px;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.themer__more:hover { color: var(--accent); }
+.themer__no {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 720px) {
+  .themer { right: 12px; bottom: 12px; width: 208px; }
+  .themer__toggle span:not(.themer__dot) { display: none; }
+  .themer__toggle { padding: 0 10px; }
+}

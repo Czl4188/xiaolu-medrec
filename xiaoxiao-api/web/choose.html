@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="rx">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>选样台 · 小鹿 主页五套纸质</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/primitives.css">
+<link rel="stylesheet" href="styles/themes.css">
+<link rel="stylesheet" href="styles/choose.css">
+</head>
+<body class="choose">
+
+<header class="bar">
+  <div class="bar__l">
+    <a class="bar__back" href="index.html">← 回主页</a>
+    <span class="bar__ttl">选样台</span>
+  </div>
+  <p class="bar__note">
+    五套用的是一模一样的版式、字阶与栅格 —— 换的只有纸色、墨色和一个强调色。
+    点左边看右边，定下来告诉我序号。
+  </p>
+</header>
+
+<main class="stage">
+
+  <aside class="list" role="tablist" aria-label="主题样本">
+    <div class="list__hd">
+      <span>NO.</span><span>样本</span><span>色卡</span>
+    </div>
+
+    <button class="opt" role="tab" data-id="rx" aria-selected="true">
+      <span class="opt__no">01</span>
+      <span class="opt__body">
+        <span class="opt__name">处方笺</span>
+        <span class="opt__desc">暖纸白 + 印泥红。最像纸档案，红章是唯一的高音。</span>
+      </span>
+      <span class="opt__sw" style="--sw-paper:#f2ece0;--sw-accent:#a6341f"></span>
+    </button>
+
+    <button class="opt" role="tab" data-id="herb" aria-selected="false">
+      <span class="opt__no">02</span>
+      <span class="opt__body">
+        <span class="opt__name">药房</span>
+        <span class="opt__desc">米灰纸 + 松墨绿。像抓药窗口那本册子，绿章表示合格。</span>
+      </span>
+      <span class="opt__sw" style="--sw-paper:#eae9dc;--sw-accent:#1e5c42"></span>
+    </button>
+
+    <button class="opt" role="tab" data-id="codex" aria-selected="false">
+      <span class="opt__no">03</span>
+      <span class="opt__body">
+        <span class="opt__name">医典</span>
+        <span class="opt__desc">冷白纸 + 藏青公章。像带铜版插图的教科书，最克制。</span>
+      </span>
+      <span class="opt__sw" style="--sw-paper:#eceff2;--sw-accent:#1d4e79"></span>
+    </button>
+
+    <button class="opt" role="tab" data-id="night" aria-selected="false">
+      <span class="opt__no">04</span>
+      <span class="opt__body">
+        <span class="opt__name">值守</span>
+        <span class="opt__desc">墨底 + 冷青。夜里值班室那台显示器，正文转无衬线。</span>
+      </span>
+      <span class="opt__sw" style="--sw-paper:#12161a;--sw-accent:#5cb2d8"></span>
+    </button>
+
+    <button class="opt" role="tab" data-id="sterile" aria-selected="false">
+      <span class="opt__no">05</span>
+      <span class="opt__body">
+        <span class="opt__name">无菌</span>
+        <span class="opt__desc">近白 + 石墨 + 医用青。没有纸味，像一台设备的操作面。</span>
+      </span>
+      <span class="opt__sw" style="--sw-paper:#f4f6f6;--sw-accent:#0c6e68"></span>
+    </button>
+
+    <p class="list__foot">
+      五套都已落到 <code>styles/themes.css</code>，<br>
+      选中后两页同时生效，右下角可随时再换。
+    </p>
+  </aside>
+
+  <section class="view">
+    <div class="view__bar">
+      <span class="view__url" id="url">index.html?theme=rx</span>
+      <a class="view__open" id="open" href="index.html?theme=rx" target="_blank" rel="noopener">
+        新标签打开这套 <span aria-hidden="true">↗</span>
+      </a>
+    </div>
+    <div class="view__frame" id="frame">
+      <iframe id="preview" src="index.html?theme=rx&embed=1" title="主页预览" scrolling="no"></iframe>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var BASE_W = 1440;
+  var BASE_H = 1180;  /* 仅作为初始高度参考 */
+
+  var opts = Array.prototype.slice.call(document.querySelectorAll(".opt"));
+  var iframe = document.getElementById("preview");
+  var frame = document.getElementById("frame");
+  var urlEl = document.getElementById("url");
+  var openEl = document.getElementById("open");
+  var current = "rx";
+
+  function fit() {
+    var w = frame.clientWidth;
+    var h = frame.clientHeight;
+    if (!w || !h) return;
+    /* 按宽度铺满：预览就是「浏览器从顶部看这一页」，
+       视口高度跟着容器走，不会留下左右白边。 */
+    var scale = Math.min(w / BASE_W, 1);   /* 宽屏也不放大，保持像素真实 */
+    iframe.style.width = BASE_W + "px";
+    iframe.style.height = Math.ceil(h / scale) + "px";
+    iframe.style.transform = "scale(" + scale + ")";
+    iframe.style.left = "0px";
+    iframe.style.top = "0px";
+  }
+
+  function select(id) {
+    if (id === current) return;
+    current = id;
+    opts.forEach(function (o) {
+      o.setAttribute("aria-selected", o.dataset.id === id ? "true" : "false");
+    });
+    urlEl.textContent = "index.html?theme=" + id;
+    openEl.href = "index.html?theme=" + id;
+    iframe.style.opacity = "0";
+    iframe.src = "index.html?theme=" + id + "&embed=1";
+  }
+
+  opts.forEach(function (o) {
+    o.addEventListener("click", function () { select(o.dataset.id); });
+  });
+
+  document.addEventListener("keydown", function (e) {
+    var ids = opts.map(function (o) { return o.dataset.id; });
+    var i = ids.indexOf(current);
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      e.preventDefault();
+      select(ids[Math.min(i + 1, ids.length - 1)]);
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      select(ids[Math.max(i - 1, 0)]);
+    }
+  });
+
+  window.addEventListener("resize", fit);
+  iframe.addEventListener("load", function () {
+    iframe.style.opacity = "1";
+    fit();
+  });
+  fit();
+})();
+</script>
+
+<script>
+/* 部署后整站受 sharecode 保护，站内跳转必须把访问参数带过去，
+   否则点「打开工作台」会落到「链接不完整」。 */
+(function () {
+  var q = location.search;
+  if (!q) return;
+  var links = document.querySelectorAll('a[href]');
+  for (var i = 0; i < links.length; i++) {
+    var a = links[i];
+    var h = a.getAttribute('href');
+    if (!h || /^(https?:)?\/\//.test(h) || h.charAt(0) === '#') continue;
+    if (h.indexOf('.html') === -1) continue;
+    a.setAttribute('href', h + (h.indexOf('?') > -1 ? '&' : '?') + q.slice(1));
+  }
+})();
+</script>
+</body>
+</html>
