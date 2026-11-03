@@ -715,6 +715,38 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 }
 .toast.is-on{opacity:1;transform:translate(-50%,0)}
 
+/* ——— 录音前同意提示：居中模态 + 半透明遮罩（小鹿贴纸风） ——— */
+.consent-modal{
+  position:fixed;inset:0;z-index:280;display:grid;place-items:center;padding:24px;
+  background:rgba(var(--ink-rgb),.5);
+  opacity:0;pointer-events:none;transition:opacity .2s var(--ease-out);
+}
+.consent-modal.is-on{opacity:1;pointer-events:auto}
+.consent-modal__card{
+  position:relative;width:min(380px,calc(100% - 32px));
+  background:var(--amber-wash);border-radius:28px;padding:24px 22px 18px;text-align:center;
+  box-shadow:var(--shadow-3);
+  transform:translateY(8px) scale(.98);transition:transform .28s var(--ease-out);
+}
+.consent-modal.is-on .consent-modal__card{transform:translateY(0) scale(1)}
+.consent-modal__deer{font-size:48px;line-height:1;margin-bottom:4px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.14))}
+.consent-modal__panel{
+  margin:8px 0 16px;padding:13px 14px;border:1.5px dashed var(--amber);
+  border-radius:18px;background:var(--paper-2);
+}
+.consent-modal__txt{
+  margin:0;font-family:var(--font-display);font-weight:700;
+  font-size:15px;line-height:1.75;color:var(--amber-ink);
+}
+.consent-modal__sub{margin:7px 0 0;font-size:10.5px;line-height:1.6;color:var(--muted)}
+.consent-modal__acts{display:flex;gap:9px}
+.consent-modal__acts .btn{flex:1}
+@media (max-width:390px){
+  .consent-modal__card{padding:20px 16px 16px;border-radius:24px}
+  .consent-modal__deer{font-size:40px}
+  .consent-modal__txt{font-size:14px}
+}
+
 .compat{
   display:flex;gap:8px;margin:0 16px 12px;padding:9px 11px;
   background:var(--amber-wash);border-left:2px solid var(--amber);
@@ -1422,6 +1454,20 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 </dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ——————————————— 录音前同意提示（模态弹窗） ——————————————— -->
+<div class="consent-modal" id="consentModal" role="dialog" aria-modal="true" aria-labelledby="consentTxt">
+  <div class="consent-modal__card">
+    <div class="consent-modal__deer" aria-hidden="true">🦌</div>
+    <div class="consent-modal__panel">
+      <p class="consent-modal__txt" id="consentTxt">开始录音前，请先征得医生与在场其他人的同意。</p>
+      <p class="consent-modal__sub">音频由浏览器语音服务处理，可能经其云端。</p>
+    </div>
+    <div class="consent-modal__acts">
+      <button class="btn btn--primary" type="button" id="consentYes">我知道了，开始</button>
+    </div>
+  </div>
+</div>
 
 <noscript>
   <div style="padding:24px;font-family:sans-serif">
@@ -3537,9 +3583,8 @@ body[data-view="work"] .btn--rec{display:inline-flex}
 
   function bindWorkbench() {
     $('#startBtn').addEventListener('click', function () {
-      /* 只进工作台，不自动开麦：先让用户看到「征得在场人同意」的提示 */
-      go('work');
-      toast('开始录音前，请先征得医生与在场其他人的同意。');
+      /* 先弹同意提示，确认后再进工作台（不自动开麦） */
+      showConsentModal(function () { go('work'); });
     });
 
     $('#recBtn').addEventListener('click', function () {
@@ -5351,6 +5396,31 @@ body[data-view="work"] .btn--rec{display:inline-flex}
     el.classList.add('is-on');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.classList.remove('is-on'); }, 3200);
+  }
+
+  /* 录音前同意提示模态弹窗：
+     · 居中 + 半透明遮罩，第一眼可见
+     · 显示 2 秒自动消失 / 点遮罩立即消失
+     · 点「确认」按钮关闭并进入后续录音流程（onConfirm） */
+  var consentTimer = null;
+  function showConsentModal(onConfirm) {
+    var modal = $('#consentModal');
+    function close() {
+      modal.classList.remove('is-on');
+      clearTimeout(consentTimer);
+    }
+    modal.classList.add('is-on');
+    clearTimeout(consentTimer);
+    consentTimer = setTimeout(close, 2000);
+    /* 点遮罩（卡片之外）立即消失 */
+    modal.onclick = function (e) {
+      if (e.target === modal) close();
+    };
+    /* 确认按钮：关闭并进入后续录音流程 */
+    $('#consentYes').onclick = function () {
+      close();
+      if (typeof onConfirm === 'function') onConfirm();
+    };
   }
 
 })();
