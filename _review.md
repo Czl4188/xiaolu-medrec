@@ -3,7 +3,7 @@
 ## 1. 文档说明
 
 - 产品：小鹿 · 个人病历档案
-- 地址：https://xiaolu-medrec.app.workbuddy.host/app.html?sharecode=C4VL6KLNQG
+- 地址：https://xiaolu-medrec.app.workbuddy.host/app.html?sharecode=<访问码>
 - 复审时间：2026-11-02 22:35–22:50
 - 当前页面版本：2026-11-02 22:13 更新
 - 复审方式：真实线上操作、接口响应检查、桌面与移动端自动化测试、前端源码审查

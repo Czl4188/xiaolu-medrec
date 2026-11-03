@@ -178,4 +178,4 @@ xiaoxiao-api/.venv/Scripts/python.exe -m pytest tests/ -q
 | `xiaoxiao-api/dist/` | 清理测试探针与本地数据库 |
 | `小鹿Agent双视角测试评估.md` | 用户视角与开发者视角评估、五轮自检记录、上线建议 |
 
-**部署信息**：`appId = wbapp_CrbSPTwk8qbehYaljoxLoH`，`localDir = xiaoxiao-api/dist`，复用链接 `https://xiaolu-medrec.app.workbuddy.host/?sharecode=C4VL6KLNQG`，http-service（FastAPI，端口 8000）。本轮改动已覆盖发布并完成线上验收。
+**部署信息**：`appId = <你的 appId>`，`localDir = xiaoxiao-api/dist`，复用链接 `https://xiaolu-medrec.app.workbuddy.host/?sharecode=<访问码>`，http-service（FastAPI，端口 8000）。本轮改动已覆盖发布并完成线上验收。
