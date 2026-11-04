@@ -526,6 +526,54 @@ def test_asr_rejects_bad_payload(client, fresh_headers):
                        json={"audio": big}).status_code == 413
 
 
+# ————————————————— 说话人分离（医生 / 患者） —————————————————
+def test_speaker_asr_requires_login(client):
+    r = client.post("/api/ai/asr/speakers", json={"audio": "data:audio/webm;base64,AAA"})
+    assert r.status_code == 401
+
+
+def test_speaker_asr_rejects_bad_payload(client, fresh_headers):
+    assert client.post("/api/ai/asr/speakers", headers=fresh_headers,
+                       json={"audio": "hello"}).status_code == 400
+    assert client.post("/api/ai/asr/speakers", headers=fresh_headers,
+                       json={"audio": "data:audio/webm;base64,AAA"}).status_code == 400
+    big = "data:audio/webm;base64," + "A" * 12_000_001
+    assert client.post("/api/ai/asr/speakers", headers=fresh_headers,
+                       json={"audio": big}).status_code == 413
+
+
+def test_merge_consecutive_sentences_by_speaker():
+    from app.api.routes_ai import _merge_sentences
+
+    sentences = [
+        {"speaker_id": 1, "text": "疼的位置在肚脐上面还是下面？", "begin": 0, "end": 1000},
+        {"speaker_id": 1, "text": "有没有反酸、恶心？", "begin": 1500, "end": 2500},
+        {"speaker_id": 0, "text": "在上腹中间，晚上会反酸。", "begin": 4000, "end": 6000},
+        {"speaker_id": 1, "text": "先去做个胃镜。", "begin": 20000, "end": 22000},
+    ]
+    out = _merge_sentences(sentences, {0: "患者", 1: "医生"})
+    assert [x["speaker"] for x in out] == ["医生", "患者", "医生"]
+    assert out[0]["text"] == "疼的位置在肚脐上面还是下面？有没有反酸、恶心？"
+    assert out[0]["end"] == 2500
+
+
+def test_guess_doctor_prefers_prescription_talk():
+    from app.api.routes_ai import _guess_doctor
+
+    sentences = [
+        {"speaker_id": 0, "text": "医生，我这两天胃疼得厉害，还老打嗝。", "begin": 0, "end": 3000},
+        {"speaker_id": 1, "text": "先做个胃镜。我开点奥美拉唑，早上空腹吃一粒，吃两周，两周后来复诊。",
+         "begin": 4000, "end": 9000},
+    ]
+    assert _guess_doctor(sentences, [0, 1]) == 1
+
+
+def test_role_map_single_speaker_is_patient():
+    from app.api.routes_ai import _role_map
+
+    assert _role_map([], None, [0]) == {0: "患者"}
+
+
 # ————————————————— 跨全部档案作答 —————————————————
 def _seed_two_visits(client, headers):
     client.post("/api/records", headers=headers, json={

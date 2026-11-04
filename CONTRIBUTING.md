@@ -171,6 +171,7 @@ git config core.hooksPath .githooks
 
 - 发布目录是 `xiaoxiao-api/dist/`，不是源码目录
 - 不要把 `docker-compose.yml` 放进 `dist`（会触发外部服务预检）
+- **发布包里不能有 `dist/data/`**：本地在 `dist` 里跑服务会生成 SQLite，上传后会用本地库覆盖线上数据
 - 发布前确认 `dist/web/app.html` 与源文件一致
 - 发布后至少验证：注册登录、抽取一条、问答一条、`/api/ping` 不泄露调试信息
 
