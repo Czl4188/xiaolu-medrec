@@ -156,10 +156,11 @@ def create_app() -> FastAPI:
             response.headers["Cache-Control"] = "no-store"
             response.headers["Pragma"] = "no-cache"
         elif response.headers.get("content-type", "").startswith("text/html"):
-            # 页面必须每次回源校验：登录方式改版后，旧缓存会让用户
+            # 页面必须每次回源：登录方式改版后，旧缓存会让用户
             # 看到上一版表单（把手机号填进用户名栏），登录必然失败。
-            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
             response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         ACCESS_LOG.info(
             "%s %s", request.method, request.url.path,
             extra={"method": request.method, "path": request.url.path,
