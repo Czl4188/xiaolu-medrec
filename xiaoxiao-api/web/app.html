@@ -656,8 +656,12 @@ body[data-view="ask"] #app{height:100dvh}
 .file-meta{margin:0 0 8px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.03em;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
 
 .transcript{display:grid;gap:6px;max-height:214px;overflow-y:auto;padding-right:2px;margin-bottom:4px}
+#trMeta:empty{display:none}
 .tr-line{display:grid;grid-template-columns:50px minmax(0,1fr);gap:8px;margin:0;font-size:12.5px;line-height:1.8;max-width:none}
 .tr-ts{font-family:var(--font-mono);font-size:9px;color:var(--muted);padding-top:4px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.tr-sp{font-family:var(--font-body);font-size:10px;font-weight:600;letter-spacing:0;padding-top:2px}
+.tr-sp--doc{color:var(--accent)}
+.tr-sp--pat{color:var(--muted)}
 .tr-tx{color:var(--ink-2);overflow-wrap:anywhere}
 .tr-line--interim .tr-tx{color:var(--muted);font-style:italic}
 
@@ -1190,7 +1194,7 @@ body[data-view="ask"] #app{height:100dvh}
       <span id="gateFootA">手机号 + 密码登录</span>
       <span id="gateFootB">登录后显示存储位置</span>
     </div>
-    <p class="gate__ver" id="gateVer">v4 · 2026-11-04 · 手机号登录</p>
+    <p class="gate__ver" id="gateVer">v5 · 2026-11-04 · 手机号登录</p>
   </div>
 </div>
 
@@ -1531,10 +1535,8 @@ body[data-view="ask"] #app{height:100dvh}
           </span>
         </button>
         <div class="panel__body">
-          <p class="file-meta" id="trMeta">未开始 · 浏览器端转写</p>
-          <div class="transcript" id="transcript">
-            <p class="empty">点上面的「开始录音」，你说的话会一段段落在这里。录音会发到服务端转成文字，转写只存进你的档案。</p>
-          </div>
+          <p class="file-meta" id="trMeta"></p>
+          <div class="transcript" id="transcript"></div>
 
           <div class="manual">
             <label class="sr-only" for="manualText">手动输入问诊内容</label>
@@ -2633,7 +2635,10 @@ body[data-view="ask"] #app{height:100dvh}
       if (API.on) {
         cloudLogin({
           isNew: isNew, username: regName, phone: phone,
-          legacy: legacyName, password: p
+          /* 只有真的切到「用户名登录」才走老通道；隐藏栏里被密码管理器自动填了
+             旧用户名时，不能把手机号登录顶掉 */
+          legacy: gateMode === 'user' ? legacyName : '',
+          password: p
         }, err);
         return;
       }
@@ -4527,30 +4532,47 @@ body[data-view="ask"] #app{height:100dvh}
     });
   }
 
-  /* 浏览器转写 + 千问转写取更完整的一份；都没有就返回原文 */
+  /* 录音结束后先试「说话人分离」，失败再退回普通转写；都没有就用浏览器实时结果 */
   function refineRecordingText(browserText) {
     return stopAudioCapture().then(function (blob) {
       if (!blob || !API.on || blob.size < 2000) return browserText;
       if (blob.size > 7 * 1024 * 1024) return browserText;
       return blobToDataURL(blob).then(function (url) {
-        return apiFetch('/api/ai/asr', {
-          method: 'POST', body: { audio: url }, timeoutMs: 90000
+        return apiFetch('/api/ai/asr/speakers', {
+          method: 'POST', body: { audio: url }, timeoutMs: 120000
+        }).then(function (res) {
+          var segs = (res && res.segments) || [];
+          if (!segs.length) throw new Error('没有分出说话人');
+          state.lines = segs.map(function (s) {
+            return { t: Date.now(), text: s.text, sp: s.speaker === '医生' ? '医生' : '患者' };
+          });
+          renderTranscript();
+          var labeled = segs.map(function (s) {
+            return (s.speaker === '医生' ? '医生' : '患者') + '：' + s.text;
+          }).join('\n');
+          var docs = segs.filter(function (s) { return s.speaker === '医生'; }).length;
+          toast(docs ? '已按说话人分开：医生 ' + docs + ' 段' : '已按说话人分行');
+          return labeled;
+        }).catch(function () {
+          return apiFetch('/api/ai/asr', {
+            method: 'POST', body: { audio: url }, timeoutMs: 90000
+          }).then(function (res) {
+            var t = clean(res && res.text);
+            if (!t || t.length < 4) return browserText;
+            if (!browserText) {
+              state.lines = [{ t: Date.now(), text: t }];
+              renderTranscript();
+              return t;
+            }
+            if (t.length >= browserText.length * 0.6) {
+              state.lines = [{ t: Date.now(), text: t }];
+              renderTranscript();
+              toast('转写已用千问校对');
+              return t;
+            }
+            return browserText;
+          });
         });
-      }).then(function (res) {
-        var t = clean(res && res.text);
-        if (!t || t.length < 4) return browserText;
-        if (!browserText) {
-          state.lines = [{ t: Date.now(), text: t }];
-          renderTranscript();
-          return t;
-        }
-        if (t.length >= browserText.length * 0.6) {
-          state.lines = [{ t: Date.now(), text: t }];
-          renderTranscript();
-          toast('转写已用千问校对');
-          return t;
-        }
-        return browserText;
       });
     }).catch(function () {
       return browserText;
@@ -4572,11 +4594,14 @@ body[data-view="ask"] #app{height:100dvh}
     var box = $('#transcript');
     if (!box) return;
     if (!state.lines.length && !state.interim) {
-      box.innerHTML = '<p class="empty">点上面的「开始录音」，你说的话会一段段落在这里。录音会发到服务端转成文字，转写只存进你的档案。</p>';
+      box.innerHTML = '';
       return;
     }
     var html = state.lines.map(function (l) {
-      return '<p class="tr-line"><span class="tr-ts">' + fmtClock(l.t) + '</span>' +
+      var who = l.sp
+        ? '<span class="tr-ts tr-sp ' + (l.sp === '医生' ? 'tr-sp--doc' : 'tr-sp--pat') + '">' + esc(l.sp) + '：</span>'
+        : '<span class="tr-ts">' + fmtClock(l.t) + '</span>';
+      return '<p class="tr-line">' + who +
         '<span class="tr-tx">' + esc(l.text) + '</span></p>';
     }).join('');
     if (state.interim) {
@@ -4944,9 +4969,11 @@ body[data-view="ask"] #app{height:100dvh}
 
     var seq = ++extractSeq;
     var draft = makeDraft(text, mode);
+    /* 角色标签只用于阅读与转写展示，抽字段时去掉，免得「医生：」混进注意事项 */
+    var plain = String(text || '').replace(/^(医生|患者|家属|护士)\s*[：:]\s*/gm, '');
     state.draft = draft;
 
-    if (!API.on) applyLocalExtract(draft, extract(text));
+    if (!API.on) applyLocalExtract(draft, extract(plain));
 
     renderRecordPanel();
 
@@ -4955,7 +4982,7 @@ body[data-view="ask"] #app{height:100dvh}
 
     /* 不再把整段原文塞进聊天输入框；需要时在记录卡上点「用这段问小鹿」 */
     if (API.on) {
-      apiFetch('/api/records/extract', { method: 'POST', body: { text: text } })
+      apiFetch('/api/records/extract', { method: 'POST', body: { text: plain } })
         .then(function (x) {
           /* 迟到的响应不得覆盖新草稿 */
           if (state.draft !== draft || seq !== extractSeq) return;
@@ -5412,9 +5439,7 @@ body[data-view="ask"] #app{height:100dvh}
   function greet() {
     addBot([
       { h: '我在。我是小鹿——只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。',
-        t: '我在。我是小鹿，只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。' },
-      { h: '想记录，去「记录」页点右上「开始录音」，或把问诊内容贴进「手动整理」。想问档案里的旧事，就在这一页直接问。看不清药盒，去「识药」拍一张。',
-        t: '想记录，去记录页点右上开始录音，或把问诊内容贴进手动整理。想问档案里的旧事，就在这一页直接问。看不清药盒，去识药拍一张。' }
+        t: '我在。我是小鹿，只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。' }
     ], [], false);
   }
 
