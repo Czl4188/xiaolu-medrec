@@ -27,7 +27,7 @@ from app.api import (
 from app.core.config import settings
 from app.core.logging import new_request_id, request_id_ctx, run_id_ctx, setup_logging, user_id_ctx
 from app.db.base import Base
-from app.db.migrate import ensure_columns
+from app.db.migrate import ensure_columns, ensure_indexes
 from app.db.session import engine
 
 logger = logging.getLogger("app.main")
@@ -83,6 +83,7 @@ async def lifespan(_app: FastAPI):
     ensure_secret_key()
     init_db()
     ensure_columns()
+    ensure_indexes()
     yield
     logger.info("服务退出，开始释放连接")
     engine.dispose()

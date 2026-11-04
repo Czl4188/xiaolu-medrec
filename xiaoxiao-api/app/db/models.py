@@ -36,8 +36,13 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
-    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # 用户名只是显示名，允许重复；登录身份是手机号
+    username: Mapped[str] = mapped_column(String(64), index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    # 手机号的 HMAC 摘要（唯一、可查）与密文（可回显给本人）
+    # 老账号没有手机号，两列为空，仍可用用户名登录
+    phone_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
+    phone_enc: Mapped[str] = mapped_column(Text, default="")
     # 展示名默认等于用户名；患者档案里的姓名单独放 profile
     display_name: Mapped[str] = mapped_column(String(64), default="")
     is_active: Mapped[bool] = mapped_column(default=True)

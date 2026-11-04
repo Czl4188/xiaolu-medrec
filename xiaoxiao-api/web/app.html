@@ -299,6 +299,9 @@ select.field__in{appearance:none;background-image:linear-gradient(45deg,transpar
 /* ————————————————— 5. 骨架 ————————————————— */
 #app{position:relative;z-index:1;min-height:100dvh;display:flex;flex-direction:column}
 #app[hidden]{display:none}
+/* 类选择器上的 display 优先级高于 UA 的 [hidden]，
+   之前每个组件都要单独补一条；统一在这里兜底，避免再漏 */
+[hidden]{display:none!important}
 .view{display:none}
 body[data-view="home"] .view--home{display:grid}
 body[data-view="mine"] .view--mine{display:block}
@@ -944,6 +947,16 @@ body[data-view="ask"] #app{height:100dvh}
 
 .tabbar{display:none}
 
+/* ——— 登录页：手机号登录 / 老账号切换 ——— */
+.field__k em{font-style:normal;font-weight:400;color:var(--muted);letter-spacing:0}
+.gate__swap{
+  appearance:none;border:0;background:none;padding:2px 0 0;margin-top:2px;
+  font:inherit;font-size:11.5px;color:var(--muted);text-align:left;
+  text-decoration:underline;text-underline-offset:3px;cursor:pointer;
+}
+.gate__swap:hover{color:var(--ink)}
+.gate__swap[hidden]{display:none}
+
 /* ——— 记录页：大号录音按钮（颜色跟着主题走） ——— */
 .rec-cta{
   display:flex;align-items:center;gap:11px;width:calc(100% - 32px);margin:4px 16px 14px;
@@ -1140,10 +1153,20 @@ body[data-view="ask"] #app{height:100dvh}
     <p class="gate__sub">录下来、转成文字、整理成能翻回去的记录。是否上传、怎么保存，登录页底部写清楚了。</p>
 
     <form id="loginForm" novalidate>
-      <label class="field">
-        <span class="field__k">用户名</span>
+      <label class="field" id="regUserWrap" hidden>
+        <span class="field__k">用户名 <em>可以重名，只用来称呼你</em></span>
+        <input class="field__in" id="regUser" type="text" autocomplete="nickname"
+               placeholder="怎么称呼你，2-24 个字" maxlength="24">
+      </label>
+      <label class="field" id="loginUserWrap" hidden>
+        <span class="field__k">用户名 <em>老账号登录用</em></span>
         <input class="field__in" id="loginUser" type="text" autocomplete="username"
-               placeholder="你的名字或任意代号" maxlength="24">
+               placeholder="以前注册时填的用户名" maxlength="24">
+      </label>
+      <label class="field" id="phoneWrap">
+        <span class="field__k">手机号</span>
+        <input class="field__in" id="loginPhone" type="tel" inputmode="numeric"
+               autocomplete="tel" placeholder="11 位手机号" maxlength="13">
       </label>
       <label class="field">
         <span class="field__k">密码</span>
@@ -1154,8 +1177,9 @@ body[data-view="ask"] #app{height:100dvh}
         <input type="checkbox" id="gateNew">
         <span>首次使用，创建新账号</span>
       </label>
-      <button class="btn btn--primary" type="submit">进入</button>
+      <button class="btn btn--primary" type="submit" id="gateSubmit">登录</button>
       <p class="gate__err" id="gateErr" role="alert"></p>
+      <button class="gate__swap" id="gateSwap" type="button">以前用用户名注册的？用用户名登录</button>
     </form>
 
     <div class="gate__foot">
@@ -1301,16 +1325,16 @@ body[data-view="ask"] #app{height:100dvh}
             <input class="field__in" id="fHospital" type="text" maxlength="30" placeholder="填了会带到首页">
           </label>
           <label class="field">
-            <span class="field__k">手机号（可选）</span>
+            <span class="field__k">登录手机号 <em>不可直接改</em></span>
             <input class="field__in" id="fPhone" type="tel" maxlength="11" autocomplete="tel"
-                   inputmode="numeric" placeholder="11 位，换设备可恢复">
+                   inputmode="numeric" readonly placeholder="在「账号与安全」里绑定或更换">
           </label>
           <label class="field">
             <span class="field__k">身份证号（可选）</span>
             <input class="field__in" id="fIdcard" type="text" maxlength="18" autocomplete="off"
                    inputmode="text" placeholder="18 位，换设备可恢复">
           </label>
-          <p class="field__hint" id="idHint">手机号与身份证加密保存在服务端，只对你本人显示；换设备登录可恢复。</p>
+          <p class="field__hint" id="idHint">手机号是登录账号，加密保存在服务端；身份证加密保存，只对你本人显示，换设备登录可恢复。</p>
           <button class="btn btn--primary" type="submit">保存资料</button>
           <p class="form__hint" id="saveHint">保存后首页、顶栏与头像立刻更新。</p>
         </form>
@@ -1344,6 +1368,21 @@ body[data-view="ask"] #app{height:100dvh}
               <button class="btn btn--ghost btn--mini" type="submit" id="pwdBtn">修改密码</button>
               <p class="form__hint" id="pwdHint">改完后其它设备需要重新登录，这台保持登录。</p>
               <p class="form__hint">忘记密码：当前没有绑定手机或邮箱，无法自助找回。请先用仍登录的设备导出档案，再注销账号重新注册。</p>
+            </form>
+
+            <form class="acct__form" id="phoneForm" hidden>
+              <p class="acct__note" id="phoneState">当前登录手机号：—</p>
+              <label class="field">
+                <span class="field__k">手机号（11 位）</span>
+                <input class="field__in" id="bindPhone" type="tel" maxlength="13"
+                       inputmode="numeric" autocomplete="tel" placeholder="换号后用它登录">
+              </label>
+              <label class="field">
+                <span class="field__k">当前密码（确认是你本人）</span>
+                <input class="field__in" id="bindPwd" type="password" autocomplete="current-password">
+              </label>
+              <button class="btn btn--ghost btn--mini" type="submit" id="bindBtn">绑定 / 更换手机号</button>
+              <p class="form__hint" id="bindHint">手机号就是登录账号，换号后下次用新号登录。</p>
             </form>
 
             <div class="acct__data">
@@ -1797,15 +1836,80 @@ body[data-view="ask"] #app{height:100dvh}
   /* ============================================================
      1. 本地存储：账号 / 会话 / 资料 / 记录
      ============================================================ */
+  /* 本地数据的归属键。
+     用户名允许重复，不能再拿它当主键：两个「张三」在同一台设备上
+     会共用头像、身份证、主题。服务端用 user.id，本机用手机号。 */
+  function acctKey() { return state.acct || state.user || ''; }
+
   var LS = {
     accounts: 'lx_accounts_v1',
     session: 'lx_session_v1',
-    user: function (u) { return 'lx_user_v1_' + u; },
-    records: function (u) { return 'lx_records_v1_' + u; },
-    theme: function (u) { return 'lx_theme_v1_' + u; },   // 账号隔离的主题
-    ai: function (u) { return 'lx_ai_v1_' + u; },         // 账号隔离的千问配置
-    scan: function (u) { return 'lx_scan_v1_' + u; }       // 账号隔离的识药记录
+    user: function () { return 'lx_user_v1_' + acctKey(); },
+    records: function () { return 'lx_records_v1_' + acctKey(); },
+    theme: function () { return 'lx_theme_v1_' + acctKey(); },   // 账号隔离的主题
+    ai: function () { return 'lx_ai_v1_' + acctKey(); },         // 账号隔离的千问配置
+    scan: function () { return 'lx_scan_v1_' + acctKey(); }       // 账号隔离的识药记录
   };
+
+  /* 用手机号登录后，用户名不再唯一；表单按模式显示不同字段 */
+  var PHONE_RE = /^1[3-9]\d{9}$/;
+  var gateMode = 'phone';   // phone | user（user 只给没绑手机号的老账号）
+
+  function normPhone(v) {
+    var d = String(v || '').replace(/\D/g, '');
+    return d.length === 13 && d.indexOf('86') === 0 ? d.slice(2) : d;
+  }
+
+  function acctOfLocal(a) { return a && a.p ? 'p:' + a.p : 'u:' + (a ? a.u : ''); }
+
+  /* 本机模式的登录手机号要落到资料里，资料页才不会显示成空 */
+  function keepLocalPhone(phone) {
+    if (!state.profile || state.profile.phone === phone) return;
+    state.profile.phone = phone;
+    write(LS.user(), state.profile);
+  }
+
+  function isRegistering() { return !!($('#gateNew') && $('#gateNew').checked); }
+
+  function gateFocus() {
+    var el = !$('#regUserWrap').hidden ? $('#regUser')
+      : (!$('#loginUserWrap').hidden ? $('#loginUser') : $('#loginPhone'));
+    if (el) el.focus();
+  }
+
+  function syncGate() {
+    var reg = isRegistering();
+    if (reg) gateMode = 'phone';
+    var legacy = !reg && gateMode === 'user';
+    $('#regUserWrap').hidden = !reg;
+    $('#loginUserWrap').hidden = !legacy;
+    $('#phoneWrap').hidden = legacy;
+    $('#gateSubmit').textContent = reg ? '创建并进入' : '登录';
+    $('#gateSwap').hidden = reg;
+    $('#gateSwap').textContent = legacy
+      ? '← 回到手机号登录'
+      : '以前用用户名注册的？用用户名登录';
+    $('#gateFootA').textContent = reg ? '手机号是登录账号，用户名可重名' : '手机号 + 密码登录';
+  }
+
+  /* 旧版本按用户名存本地数据；换成账号 ID 后要把老数据接过来，
+     否则升级后头像、身份证、主题看起来「丢了」 */
+  function migrateLocalKeys(acct, name) {
+    if (!acct || !name || acct === name) return;
+    var flag = 'lx_keys_v2_' + acct;
+    try {
+      if (localStorage.getItem(flag)) return;
+      ['lx_user_v1_', 'lx_records_v1_', 'lx_theme_v1_', 'lx_ai_v1_', 'lx_scan_v1_', 'lx_cal_v1_']
+        .forEach(function (pre) {
+          var from = pre + name, to = pre + acct;
+          var old = localStorage.getItem(from);
+          if (old !== null && localStorage.getItem(to) === null) {
+            localStorage.setItem(to, old);
+          }
+        });
+      localStorage.setItem(flag, '1');
+    } catch (e) {}
+  }
 
   function read(key, fallback) {
     try {
@@ -1980,6 +2084,7 @@ body[data-view="ask"] #app{height:100dvh}
     busy: false,
     cloud: false,        // 是否已连上服务端
     saving: false,       // 归档 / 修改请求进行中
+    acct: '',            // 本地数据归属键：服务端用 id，本机用手机号
     calPending: false,   // 刚结束一次录音，等归档弹窗关闭后问日历
     consentSeen: false,  // 本次登录是否已经看过录音同意提示
     editId: '',          // 正在修改的已归档记录
@@ -2019,8 +2124,7 @@ body[data-view="ask"] #app{height:100dvh}
         badge.title = on
           ? '已连接服务端：账号、档案、抽取与作答都走 /api'
           : '未连接服务端：数据只存在这台设备的浏览器里';
-        var fa = $('#gateFootA'), fb = $('#gateFootB');
-        if (fa) fa.textContent = '首次使用请勾选创建';
+        var fb = $('#gateFootB');
         if (fb) fb.textContent = on ? '服务端保存 · 跨设备可见' : '本机存储 · 不上传';
       }
 
@@ -2028,18 +2132,22 @@ body[data-view="ask"] #app{height:100dvh}
         API.token = loadToken();
         if (API.token) {
           apiFetch('/api/me')
-            .then(function (me) { enterApp(me.username); })
-            .catch(function () { saveToken(''); $('#loginUser').focus(); });
+            .then(function (me) { enterApp(me.username, 'id:' + me.id); })
+            .catch(function () { saveToken(''); gateFocus(); });
           return;
         }
       } else {
         var sess = read(LS.session, null);
         if (sess && sess.u) {
-          var acc = read(LS.accounts, []).filter(function (a) { return a.u === sess.u; })[0];
-          if (acc) { enterApp(sess.u); return; }
+          var acc = read(LS.accounts, []).filter(function (a) {
+            /* 老会话没有 p 字段，按用户名找没绑手机号的老账号 */
+            return sess.p ? a.p === sess.p : (!a.p && a.u === sess.u);
+          })[0];
+          if (acc) { enterApp(acc.u, acctOfLocal(acc)); return; }
         }
       }
-      $('#loginUser').focus();
+      syncGate();
+      gateFocus();
     });
   }
 
@@ -2238,20 +2346,33 @@ body[data-view="ask"] #app{height:100dvh}
     var note = $('#acctNote');
     var form = $('#pwdForm');
     var danger = $('#acctDanger');
+    var phoneForm = $('#phoneForm');
     var line = $('#acctDataServer');
     if (!note) return;
 
     if (API.on) {
-      note.textContent = '账号由服务端验证，密码以散列保存，服务端不存明文。';
+      note.textContent = '账号由服务端验证，手机号是登录账号，密码以散列保存。';
       form.hidden = false;
       danger.hidden = false;
+      if (phoneForm) phoneForm.hidden = false;
       line.textContent = '病历与个人资料保存在服务端，换设备登录可恢复。';
+      renderPhoneState();
     } else {
       note.textContent = '本机模式：账号与档案只存在这个浏览器，清除浏览器数据会一起删除，无法跨设备恢复。';
       form.hidden = true;
       danger.hidden = true;
+      if (phoneForm) phoneForm.hidden = true;
       line.textContent = '病历与个人资料只保存在这台设备的浏览器里，没有上传服务端。';
     }
+  }
+
+  function renderPhoneState() {
+    var el = $('#phoneState');
+    if (!el) return;
+    var phone = (state.profile && state.profile.phone) || '';
+    el.textContent = phone
+      ? '当前登录手机号：' + phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2')
+      : '还没绑定手机号：绑定后才能用手机号登录。';
   }
 
   function bindAccount() {
@@ -2262,6 +2383,14 @@ body[data-view="ask"] #app{height:100dvh}
       e.preventDefault();
       changePassword();
     });
+
+    var pform = $('#phoneForm');
+    if (pform) {
+      pform.addEventListener('submit', function (e) {
+        e.preventDefault();
+        bindPhone();
+      });
+    }
 
     var ack = $('#delAck');
     var pwd = $('#delPwd');
@@ -2302,6 +2431,48 @@ body[data-view="ask"] #app{height:100dvh}
     }).then(function () { btn.disabled = false; });
   }
 
+  function bindPhone() {
+    var phone = normPhone($('#bindPhone').value);
+    var pwd = $('#bindPwd').value;
+    var hint = $('#bindHint');
+    var btn = $('#bindBtn');
+
+    if (!PHONE_RE.test(phone)) {
+      hint.textContent = '手机号要填 11 位，1 开头。';
+      $('#bindPhone').focus();
+      return;
+    }
+    if (!pwd) {
+      hint.textContent = '请输入当前密码确认。';
+      $('#bindPwd').focus();
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '提交中…';
+    apiFetch('/api/me/phone', { method: 'POST', body: { phone: phone, password: pwd } })
+      .then(function (r) {
+        state.profile = state.profile || {};
+        state.profile.phone = r.phone || phone;
+        write(LS.user(), state.profile);
+        $('#bindPhone').value = '';
+        $('#bindPwd').value = '';
+        renderPhoneState();
+        if ($('#fPhone')) $('#fPhone').value = state.profile.phone;
+        hint.textContent = r.changed === false
+          ? '这个号码本来就是你的登录手机号。'
+          : '已换绑，下次用新手机号登录。';
+        toast(r.changed === false ? '号码没有变化。' : '手机号已更新。');
+      })
+      .catch(function (err) {
+        hint.textContent = err.message;
+      })
+      .then(function () {
+        btn.disabled = false;
+        btn.textContent = '绑定 / 更换手机号';
+      });
+  }
+
   function deleteAccount() {
     var pwd = $('#delPwd').value;
     var hint = $('#delHint');
@@ -2316,14 +2487,18 @@ body[data-view="ask"] #app{height:100dvh}
         hint.textContent = '已删除 ' + (r.records || 0) + ' 份记录，正在退出…';
         var u = state.user;
         try {
-          localStorage.removeItem(LS.user(u));
-          localStorage.removeItem(LS.records(u));
-          localStorage.removeItem(LS.theme(u));
-          localStorage.removeItem(LS.ai(u));
-          localStorage.removeItem(LS.scan(u));
+          localStorage.removeItem(LS.user());
+          localStorage.removeItem(LS.records());
+          localStorage.removeItem(LS.theme());
+          localStorage.removeItem(LS.ai());
+          localStorage.removeItem(LS.scan());
+          localStorage.removeItem('lx_cal_v1_' + state.acct);
+          localStorage.removeItem('lx_keys_v2_' + state.acct);
           localStorage.removeItem(LS.session);
           /* 只移除被注销的账号，别把同浏览器里其他人的账号条目一起清掉 */
-          var rest = read(LS.accounts, []).filter(function (a) { return a && a.u !== u; });
+          var rest = read(LS.accounts, []).filter(function (a) {
+            return a && acctOfLocal(a) !== state.acct;
+          });
           write(LS.accounts, rest);
         } catch (e) {}
         setTimeout(doLogout, 500);
@@ -2419,40 +2594,86 @@ body[data-view="ask"] #app{height:100dvh}
      4. 登录 / 退出
      ============================================================ */
   function bindLogin() {
+    syncGate();
+    $('#gateNew').addEventListener('change', syncGate);
+    $('#gateSwap').addEventListener('click', function () {
+      gateMode = gateMode === 'user' ? 'phone' : 'user';
+      syncGate();
+      gateFocus();
+    });
+
     $('#loginForm').addEventListener('submit', function (e) {
       e.preventDefault();
-      var u = $('#loginUser').value.trim();
       var p = $('#loginPass').value;
       var err = $('#gateErr');
+      var isNew = $('#gateNew').checked;
+      var phone = normPhone($('#loginPhone').value);
+      var regName = $('#regUser').value.trim();
+      var legacyName = $('#loginUser').value.trim();
 
-      if (u.length < 2) { err.textContent = '用户名至少 2 个字。'; return; }
+      if (isNew) {
+        if (regName.length < 2) { err.textContent = '用户名至少 2 个字。'; return; }
+        if (!PHONE_RE.test(phone)) { err.textContent = '手机号要填 11 位，1 开头。'; return; }
+      } else if (gateMode === 'user') {
+        if (legacyName.length < 2) { err.textContent = '请填以前用的用户名。'; return; }
+      } else if (!PHONE_RE.test(phone)) {
+        err.textContent = '手机号要填 11 位，1 开头。';
+        return;
+      }
       if (p.length < (API.on ? 8 : 4)) {
         err.textContent = API.on ? '密码至少 8 位。' : '密码至少 4 位。';
         return;
       }
 
-      var isNew = $('#gateNew').checked;
-
-      if (API.on) { cloudLogin(u, p, err, isNew); return; }
-
-      var list = read(LS.accounts, []);
-      var hit = list.filter(function (a) { return a.u === u; })[0];
-
-      if (hit && hit.h !== hash(u, p)) {
-        err.textContent = '这个用户名的密码不对，再试一次。';
+      if (API.on) {
+        cloudLogin({
+          isNew: isNew, username: regName, phone: phone,
+          legacy: legacyName, password: p
+        }, err);
         return;
       }
-      if (!hit) {
-        if (!isNew) {
-          err.textContent = '本机没有这个账号。首次使用请先勾选「创建新账号」。';
+
+      var list = read(LS.accounts, []);
+
+      /* 新建：手机号是本机唯一身份，用户名可重名 */
+      if (isNew) {
+        if (list.some(function (a) { return a.p === phone; })) {
+          err.textContent = '这个手机号在本机已经注册过了，取消勾选后登录。';
           return;
         }
-        list.push({ u: u, h: hash(u, p), at: Date.now() });
+        list.push({ u: regName, p: phone, h: hash(phone, p), at: Date.now() });
         write(LS.accounts, list);
+        write(LS.session, { u: regName, p: phone, at: Date.now() });
+        err.textContent = '';
+        enterApp(regName, 'p:' + phone);
+        keepLocalPhone(phone);
+        return;
       }
-      write(LS.session, { u: u, at: Date.now() });
+
+      /* 老账号：没有手机号的本机账号，仍用用户名进 */
+      if (gateMode === 'user') {
+        var old = list.filter(function (a) { return !a.p && a.u === legacyName; })[0];
+        if (!old) { err.textContent = '本机没有这个用户名的老账号。'; return; }
+        if (old.h !== hash(legacyName, p)) { err.textContent = '密码不对，再试一次。'; return; }
+        write(LS.session, { u: old.u, at: Date.now() });
+        err.textContent = '';
+        enterApp(old.u, 'u:' + old.u);
+        return;
+      }
+
+      var hit = list.filter(function (a) { return a.p === phone; })[0];
+      if (!hit) {
+        err.textContent = '本机没有这个手机号的账号。首次使用请先勾选「创建新账号」。';
+        return;
+      }
+      if (hit.h !== hash(phone, p)) {
+        err.textContent = '手机号或密码不对，再试一次。';
+        return;
+      }
+      write(LS.session, { u: hit.u, p: phone, at: Date.now() });
       err.textContent = '';
-      enterApp(u);
+      enterApp(hit.u, 'p:' + phone);
+      keepLocalPhone(phone);
     });
 
     $('#exportBtn').addEventListener('click', exportArchive);
@@ -2472,6 +2693,7 @@ body[data-view="ask"] #app{height:100dvh}
     API.token = '';
     stopSpeech();
     state.user = '';
+    state.acct = '';
     state.profile = null;
     state.records = [];
     state.draft = null;
@@ -2490,55 +2712,69 @@ body[data-view="ask"] #app{height:100dvh}
     $('#gate').hidden = false;
     $('#loginPass').value = '';
     $('#loginUser').value = '';
+    $('#regUser').value = '';
+    $('#loginPhone').value = '';
+    gateMode = 'phone';
     /* 退出后必须取消「创建新账号」，否则下一次登录会被当成注册 */
     if ($('#gateNew')) $('#gateNew').checked = false;
     document.body.removeAttribute('data-view');
-    $('#loginUser').focus();
+    syncGate();
+    gateFocus();
   }
 
 
   /* 云端登录：先验密码；用户不存在则视为首次使用，直接建档。
      注册要求 8 位以上，且在服务端做 pbkdf2 散列 —— 不是前端比对。 */
-  function cloudLogin(u, p, err, isNew) {
+  function cloudLogin(form, err) {
     err.textContent = '';
-    var btn = $('#loginForm button[type=submit]');
+    var btn = $('#gateSubmit');
     var old = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.textContent = isNew ? '创建中…' : '进入中…'; }
+    var busy = form.isNew ? '创建中…' : '登录中…';
+    if (btn) { btn.disabled = true; btn.textContent = busy; }
 
     function done(msg) {
-      if (btn) { btn.disabled = false; btn.textContent = old || '进入'; }
+      if (btn) { btn.disabled = false; btn.textContent = old || '登录'; }
       if (msg) err.textContent = msg;
     }
-    function ok(r) {
-      saveToken(r.access_token);
-      API.token = r.access_token;
-      done('');
-      enterApp(r.user.username);
-    }
 
-    var path = isNew ? '/api/auth/register' : '/api/auth/login';
-    apiFetch(path, { method: 'POST', body: { username: u, password: p } })
-      .then(ok)
+    var path = form.isNew ? '/api/auth/register' : '/api/auth/login';
+    var body = form.isNew
+      ? { username: form.username, phone: form.phone, password: form.password }
+      : (form.legacy
+        ? { username: form.legacy, password: form.password }
+        : { phone: form.phone, password: form.password });
+
+    apiFetch(path, { method: 'POST', body: body })
+      .then(function (r) {
+        saveToken(r.access_token);
+        API.token = r.access_token;
+        done('');
+        enterApp(r.user.username, 'id:' + r.user.id);
+      })
       .catch(function (e) {
-        if (isNew && e.status === 409) {
-          done('这个账号已经存在，取消勾选后再登录。');
-        } else if (!isNew && e.status === 401) {
-          done('账号或密码不对。首次使用，请先勾选「创建新账号」。');
-        } else if (isNew && e.status === 400 && /密码/.test(e.message)) {
-          done(e.message);
+        if (form.isNew && e.status === 409) {
+          done('这个手机号已经注册过了。取消勾选直接登录，或换一个手机号。');
+        } else if (!form.isNew && e.status === 401) {
+          done(form.legacy
+            ? '用户名或密码不对。新账号请用手机号登录。'
+            : '手机号或密码不对。首次使用，请先勾选「创建新账号」。');
+        } else if (e.status === 422) {
+          done('格式不对：手机号 11 位，密码至少 8 位。');
         } else {
           done(e.message);
         }
       });
   }
 
-  function enterApp(name) {
+  function enterApp(name, acct) {
     state.user = name;
+    state.acct = acct || ('u:' + name);
+    migrateLocalKeys(state.acct, name);
     loadLocalAccount(name);
 
     if (API.on) {
       /* 头像与身份证明明只存本机，读服务端资料时不能把它们覆盖掉 */
-      var localProf = read(LS.user(name), null) || {};
+      var localProf = read(LS.user(), null) || {};
       state.profile = {
         name: name, age: '', gender: '', hospital: '',
         avatar: localProf.avatar || '', idcard: localProf.idcard || '',
@@ -2588,11 +2824,11 @@ body[data-view="ask"] #app{height:100dvh}
       return;
     }
 
-    var existed = read(LS.user(name), null);
+    var existed = read(LS.user(), null);
     state.profile = existed || { name: name, age: '', gender: '', hospital: '' };
     if (!state.profile.name) state.profile.name = name;
-    if (!existed) write(LS.user(name), state.profile);
-    state.records = read(LS.records(name), []);
+    if (!existed) write(LS.user(), state.profile);
+    state.records = read(LS.records(), []);
     if (!Array.isArray(state.records)) state.records = [];
 
     $('#gate').hidden = true;
@@ -2666,7 +2902,7 @@ body[data-view="ask"] #app{height:100dvh}
       /* 必须和 read() 的 JSON.parse 对齐：裸字符串会让下次启动解析失败、悄悄退回默认 */
       try { localStorage.setItem('lx_theme_guest_v1', JSON.stringify(id)); } catch (e) {}
       if (state.user) {
-        try { localStorage.setItem(LS.theme(state.user), JSON.stringify(id)); } catch (e) {}
+        try { localStorage.setItem(LS.theme(), JSON.stringify(id)); } catch (e) {}
       }
     }
   }
@@ -2692,12 +2928,12 @@ body[data-view="ask"] #app{height:100dvh}
   };
 
   function loadLocalAccount(name) {
-    state.ai = read(LS.ai(name), null) || {};
-    state.scanHist = read(LS.scan(name), []);
+    state.ai = read(LS.ai(), null) || {};
+    state.scanHist = read(LS.scan(), []);
     if (!Array.isArray(state.scanHist)) state.scanHist = [];
     state.scan = { image: '', meds: [], source: '', at: 0 };
     /* 新账号不继承上一个账号的主题：没有自己的主题就用默认暖纸 */
-    applyTheme(read(LS.theme(name), 'light'), false);
+    applyTheme(read(LS.theme(), 'light'), false);
   }
 
   function aiCfg() {
@@ -2981,11 +3217,11 @@ body[data-view="ask"] #app{height:100dvh}
     if (!state.user) return;
     shrinkImage(image, 240, 0.55, function (thumb) {
       var entry = { id: 's_' + Date.now().toString(36), at: Date.now(), meds: meds, thumb: thumb };
-      var all = read(LS.scan(state.user), []);
+      var all = read(LS.scan(), []);
       if (!Array.isArray(all)) all = [];
       all.unshift(entry);
       all = all.slice(0, 20);
-      if (write(LS.scan(state.user), all)) {
+      if (write(LS.scan(), all)) {
         state.scanHist = all;
         renderScanHist();
       }
@@ -3111,7 +3347,7 @@ body[data-view="ask"] #app{height:100dvh}
       visionModel: clean($('#aiVisionModel').value) || AI_DEFAULT.visionModel
     };
     state.ai = cfg;
-    if (write(LS.ai(state.user), cfg)) {
+    if (write(LS.ai(), cfg)) {
         renderAiState();
     }
   }
@@ -3363,7 +3599,7 @@ body[data-view="ask"] #app{height:100dvh}
         var p = state.profile || { name: state.user, age: '', gender: '', hospital: '' };
         p.avatar = dataUrl;
         state.profile = p;
-        if (write(LS.user(state.user), p)) {
+        if (write(LS.user(), p)) {
           syncIdentity();
           renderHome();
           renderMine();
@@ -3376,15 +3612,8 @@ body[data-view="ask"] #app{height:100dvh}
       e.preventDefault();
       var p = state.profile || {};
       var name = clean($('#fName').value) || state.user;
-      var phone = clean($('#fPhone').value).replace(/[\s-]/g, '');
       var idcard = clean($('#fIdcard').value).toUpperCase();
 
-      if (phone && !/^1\d{10}$/.test(phone)) {
-        $('#saveHint').textContent = '手机号应为 11 位数字，先改一下再保存。';
-        toast('手机号格式不对：需要 11 位数字。');
-        $('#fPhone').focus();
-        return;
-      }
       if (idcard && !/^\d{17}[\dX]$/.test(idcard)) {
         $('#saveHint').textContent = '身份证号应为 18 位，末位可以是 X。';
         toast('身份证号格式不对：需要 18 位。');
@@ -3396,7 +3625,6 @@ body[data-view="ask"] #app{height:100dvh}
       p.age = clean($('#fAge').value);
       p.gender = $('#fGender').value;
       p.hospital = clean($('#fHospital').value);
-      p.phone = phone;
       p.idcard = idcard;
       state.profile = p;
 
@@ -3418,7 +3646,7 @@ body[data-view="ask"] #app{height:100dvh}
             phone: keepPhone
           };
         }
-        write(LS.user(state.user), state.profile);
+        write(LS.user(), state.profile);
         syncIdentity();
         renderHome();
         renderMine();
@@ -3437,7 +3665,7 @@ body[data-view="ask"] #app{height:100dvh}
       $('#saveHint').textContent = '正在同步到服务端…';
       apiFetch('/api/me/profile', {
         method: 'PUT',
-        body: { name: name, age: p.age, gender: p.gender, hospital: p.hospital, phone: p.phone, idcard: p.idcard }
+        body: { name: name, age: p.age, gender: p.gender, hospital: p.hospital, idcard: p.idcard }
       }).then(function (server) {
         apply(server);
         toast('资料已同步到服务端，换设备登录也能看到。');
@@ -3659,7 +3887,7 @@ body[data-view="ask"] #app{height:100dvh}
   function persistRecords() {
     // 云端模式下每条变更都已单独提交，这里不再覆盖整份列表（避免回写旧数据）
     if (API.on) return;
-    write(LS.records(state.user), state.records);
+    write(LS.records(), state.records);
   }
 
   /* ============================================================

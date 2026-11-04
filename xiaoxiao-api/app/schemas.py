@@ -1,11 +1,14 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.core.crypto import normalize_phone
 
 
 # ————————————————— 鉴权 —————————————————
 class RegisterIn(BaseModel):
     username: str = Field(min_length=2, max_length=32)
+    phone: str = Field(min_length=11, max_length=20)
     password: str = Field(min_length=8, max_length=128)
 
     @field_validator("username")
@@ -18,10 +21,50 @@ class RegisterIn(BaseModel):
             raise ValueError("用户名不能包含斜杠或控制字符")
         return v
 
+    @field_validator("phone")
+    @classmethod
+    def _clean_phone(cls, v: str) -> str:
+        digits = normalize_phone(v)
+        if len(digits) != 11 or not digits.startswith("1") or digits[1] not in "3456789":
+            raise ValueError("手机号要填 11 位，1 开头")
+        return digits
+
 
 class LoginIn(BaseModel):
-    username: str
+    """手机号是登录账号；username 只给还没绑手机号的老账号用。"""
+
+    phone: str = ""
+    username: str = ""
     password: str
+
+    @field_validator("phone")
+    @classmethod
+    def _clean_phone(cls, v: str) -> str:
+        return normalize_phone(v)
+
+    @field_validator("username")
+    @classmethod
+    def _clean_login_username(cls, v: str) -> str:
+        return v.strip()
+
+    @model_validator(mode="after")
+    def _need_one_identity(self):
+        if not self.phone and not self.username:
+            raise ValueError("请填手机号")
+        return self
+
+
+class BindPhoneIn(BaseModel):
+    phone: str = Field(min_length=11, max_length=20)
+    password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("phone")
+    @classmethod
+    def _clean_bind_phone(cls, v: str) -> str:
+        digits = normalize_phone(v)
+        if len(digits) != 11 or not digits.startswith("1") or digits[1] not in "3456789":
+            raise ValueError("手机号要填 11 位，1 开头")
+        return digits
 
 
 class UserOut(BaseModel):
@@ -29,6 +72,9 @@ class UserOut(BaseModel):
     id: str
     username: str
     display_name: str = ""
+    # 只对本人返回明文；由路由层解密后填入
+    phone: str = ""
+    phone_bound: bool = True
 
 
 class TokenOut(BaseModel):

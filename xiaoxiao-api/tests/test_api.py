@@ -42,11 +42,11 @@ def test_requires_token(client):
     assert client.get("/api/records", headers={"Authorization": "Bearer bad.token.here"}).status_code == 401
 
 
-def test_login_wrong_password(client, auth_headers):
-    r = client.post("/api/auth/login", json={"username": "测试用户甲", "password": "wrong-pass"})
+def test_login_wrong_password(client):
+    r = client.post("/api/auth/login", json={"phone": "13800000000", "password": "wrong-pass"})
     assert r.status_code == 401
     # 错误信息不应泄露「用户是否存在」
-    assert "用户名或密码" in r.json()["detail"]
+    assert "手机号或密码" in r.json()["detail"]
 
 
 # ————————————————— 隔离 —————————————————
@@ -351,8 +351,8 @@ def test_extract_visit_hint_and_drug_without_suffix(client, auth_headers):
 
 
 # ————————————————— 账号生命周期（P1-08） —————————————————
-def _login_headers(client, username, password):
-    r = client.post("/api/auth/login", json={"username": username, "password": password})
+def _login_headers(client, phone, password):
+    r = client.post("/api/auth/login", json={"phone": phone, "password": password})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -366,10 +366,12 @@ def test_change_password_requires_old_password(client, fresh_headers):
 
 def test_change_password_rotates_other_sessions(client):
     username = "改密" + uuid.uuid4().hex[:8]
-    reg = client.post("/api/auth/register", json={"username": username, "password": "pass12345"})
+    phone = "139" + f"{uuid.uuid4().int % 10**8:08d}"
+    reg = client.post("/api/auth/register",
+                      json={"username": username, "phone": phone, "password": "pass12345"})
     assert reg.status_code == 200, reg.text
     first = {"Authorization": f"Bearer {reg.json()['access_token']}"}
-    second = _login_headers(client, username, "pass12345")
+    second = _login_headers(client, phone, "pass12345")
 
     r = client.post("/api/me/password", headers=first,
                     json={"old_password": "pass12345", "new_password": "newpass12345"})
@@ -381,14 +383,16 @@ def test_change_password_rotates_other_sessions(client):
 
     # 旧密码失效，新密码可用
     assert client.post("/api/auth/login",
-                       json={"username": username, "password": "pass12345"}).status_code == 401
+                       json={"phone": phone, "password": "pass12345"}).status_code == 401
     assert client.post("/api/auth/login",
-                       json={"username": username, "password": "newpass12345"}).status_code == 200
+                       json={"phone": phone, "password": "newpass12345"}).status_code == 200
 
 
 def test_delete_account_removes_records_and_login(client):
     username = "注销" + uuid.uuid4().hex[:8]
-    reg = client.post("/api/auth/register", json={"username": username, "password": "pass12345"})
+    phone = "137" + f"{uuid.uuid4().int % 10**8:08d}"
+    reg = client.post("/api/auth/register",
+                      json={"username": username, "phone": phone, "password": "pass12345"})
     assert reg.status_code == 200
     headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
     _new_record(client, headers, client_id="del_001")
@@ -406,9 +410,11 @@ def test_delete_account_removes_records_and_login(client):
     # 令牌与账号同时失效；同名可重新注册，且看不到旧数据
     assert client.get("/api/me", headers=headers).status_code == 401
     assert client.post("/api/auth/login",
-                       json={"username": username, "password": "pass12345"}).status_code == 401
+                       json={"phone": phone, "password": "pass12345"}).status_code == 401
 
-    again = client.post("/api/auth/register", json={"username": username, "password": "pass12345"})
+    # 同名可重新注册（用户名可重复），手机号已被注销释放，也能再用
+    again = client.post("/api/auth/register",
+                        json={"username": username, "phone": phone, "password": "pass12345"})
     assert again.status_code == 200
     again_headers = {"Authorization": f"Bearer {again.json()['access_token']}"}
     assert client.get("/api/records", headers=again_headers).json() == []
@@ -455,27 +461,35 @@ def test_med_query_skips_latest_visit_without_meds(client, fresh_headers):
 # ————————————————— 资料同步与模型代理 —————————————————
 def test_profile_syncs_phone_and_idcard_across_sessions(client):
     username = "资料" + uuid.uuid4().hex[:8]
-    reg = client.post("/api/auth/register", json={"username": username, "password": "pass12345"})
+    phone = "136" + f"{uuid.uuid4().int % 10**8:08d}"
+    reg = client.post("/api/auth/register",
+                      json={"username": username, "phone": phone, "password": "pass12345"})
     h1 = {"Authorization": f"Bearer {reg.json()['access_token']}"}
     r = client.put("/api/me/profile", headers=h1, json={
-        "name": "同步测试", "phone": "13800138000", "idcard": "110101199001011234",
+        "name": "同步测试", "idcard": "110101199001011234",
     })
     assert r.status_code == 200, r.text
-    assert r.json()["phone"] == "13800138000"
+    # 手机号是登录账号，资料页回显的就是注册时那个
+    assert r.json()["phone"] == phone
 
     # 新会话 = 另一台设备
     tok = client.post("/api/auth/login",
-                      json={"username": username, "password": "pass12345"}).json()["access_token"]
+                      json={"phone": phone, "password": "pass12345"}).json()["access_token"]
     p = client.get("/api/me/profile", headers={"Authorization": f"Bearer {tok}"}).json()
-    assert p["phone"] == "13800138000"
+    assert p["phone"] == phone
     assert p["idcard"] == "110101199001011234"
 
 
-def test_profile_rejects_bad_phone_and_idcard(client, fresh_headers):
-    assert client.put("/api/me/profile", headers=fresh_headers,
-                      json={"phone": "123"}).status_code == 422
+def test_profile_rejects_bad_idcard(client, fresh_headers):
     assert client.put("/api/me/profile", headers=fresh_headers,
                       json={"idcard": "abc"}).status_code == 422
+
+
+def test_bind_phone_rejects_bad_format_and_wrong_password(client, fresh_headers):
+    assert client.post("/api/me/phone", headers=fresh_headers,
+                       json={"phone": "123", "password": "pass12345"}).status_code == 422
+    assert client.post("/api/me/phone", headers=fresh_headers,
+                       json={"phone": "13500135000", "password": "wrong-pass"}).status_code == 400
 
 
 def test_ai_requires_login(client):
@@ -572,3 +586,92 @@ def test_explicit_date_does_not_leak_other_records(client, fresh_headers):
                        json={"question": "9月1日开了什么药？"}).json()
     assert "奥美拉唑" in body["answer"]
     assert "阿莫西林" not in body["answer"], body["answer"]
+
+
+# ————————————————— 手机号登录 / 用户名可重复 —————————————————
+def _reg(client, username, phone, password="pass12345"):
+    return client.post("/api/auth/register",
+                       json={"username": username, "phone": phone, "password": password})
+
+
+def test_duplicate_username_allowed_and_data_isolated(client):
+    """两个人都叫「张三」，必须是两个账号，记录互不可见。"""
+    phone_a = "133" + f"{uuid.uuid4().int % 10**8:08d}"
+    phone_b = "134" + f"{uuid.uuid4().int % 10**8:08d}"
+    a = _reg(client, "同名张三", phone_a)
+    b = _reg(client, "同名张三", phone_b)
+    assert a.status_code == 200, a.text
+    assert b.status_code == 200, b.text
+    assert a.json()["user"]["id"] != b.json()["user"]["id"]
+
+    ha = {"Authorization": f"Bearer {a.json()['access_token']}"}
+    hb = {"Authorization": f"Bearer {b.json()['access_token']}"}
+    _new_record(client, ha, client_id="dup_a")
+    assert len(client.get("/api/records", headers=ha).json()) == 1
+    assert client.get("/api/records", headers=hb).json() == []
+
+
+def test_phone_must_be_unique(client):
+    phone = "135" + f"{uuid.uuid4().int % 10**8:08d}"
+    assert _reg(client, "手机号甲", phone).status_code == 200
+    second = _reg(client, "手机号乙", phone)
+    assert second.status_code == 409
+    assert "手机号" in second.json()["detail"]
+
+
+def test_register_rejects_bad_phone(client):
+    assert _reg(client, "手机号格式", "1234").status_code == 422
+    assert _reg(client, "手机号格式", "12800128000").status_code == 422
+
+
+def test_new_account_cannot_login_by_username(client):
+    """新账号身份是手机号，用户名只是显示名。"""
+    phone = "132" + f"{uuid.uuid4().int % 10**8:08d}"
+    assert _reg(client, "只能手机号", phone).status_code == 200
+    r = client.post("/api/auth/login", json={"username": "只能手机号", "password": "pass12345"})
+    assert r.status_code == 401
+
+
+def test_login_is_case_insensitive_to_phone_format(client):
+    phone = "131" + f"{uuid.uuid4().int % 10**8:08d}"
+    assert _reg(client, "格式容错", phone).status_code == 200
+    spaced = phone[:3] + " " + phone[3:7] + " " + phone[7:]
+    r = client.post("/api/auth/login", json={"phone": spaced, "password": "pass12345"})
+    assert r.status_code == 200, r.text
+
+
+def test_legacy_account_can_login_by_username_then_bind_phone(client):
+    """老账号（没有手机号）不能因为改了登录方式就被锁在门外。"""
+    from app.core.security import hash_password
+    from app.db import repo
+    from app.db.session import SessionLocal
+
+    username = "老账号" + uuid.uuid4().hex[:6]
+    with SessionLocal() as db:
+        repo.create_user(db, username, hash_password("pass12345"))
+
+    # 用用户名还能登进来
+    r = client.post("/api/auth/login", json={"username": username, "password": "pass12345"})
+    assert r.status_code == 200, r.text
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert r.json()["user"]["phone_bound"] is False
+
+    # 绑定手机号后，两种方式都能登录，且都指向同一个账号
+    phone = "130" + f"{uuid.uuid4().int % 10**8:08d}"
+    bound = client.post("/api/me/phone", headers=headers,
+                        json={"phone": phone, "password": "pass12345"})
+    assert bound.status_code == 200, bound.text
+    assert bound.json()["changed"] is True
+
+    by_phone = client.post("/api/auth/login", json={"phone": phone, "password": "pass12345"})
+    assert by_phone.status_code == 200
+    assert by_phone.json()["user"]["id"] == r.json()["user"]["id"]
+    assert client.get("/api/me", headers=headers).json()["phone"] == phone
+
+
+def test_bind_phone_rejects_number_taken_by_another_account(client, fresh_headers):
+    phone = "139" + f"{uuid.uuid4().int % 10**8:08d}"
+    assert _reg(client, "占号的人", phone).status_code == 200
+    r = client.post("/api/me/phone", headers=fresh_headers,
+                    json={"phone": phone, "password": "pass12345"})
+    assert r.status_code == 409

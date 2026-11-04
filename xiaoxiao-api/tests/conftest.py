@@ -31,10 +31,20 @@ def client():
         yield c
 
 
-def _auth(client, username, password="pass12345"):
-    r = client.post("/api/auth/register", json={"username": username, "password": password})
+def _phone() -> str:
+    """每次注册用不同的手机号：手机号是唯一身份。"""
+    n = uuid.uuid4().int % 10**8
+    return "138" + f"{n:08d}"
+
+
+def _auth(client, username, password="pass12345", phone=None):
+    phone = phone or _phone()
+    r = client.post(
+        "/api/auth/register",
+        json={"username": username, "phone": phone, "password": password},
+    )
     if r.status_code == 409:
-        r = client.post("/api/auth/login", json={"username": username, "password": password})
+        r = client.post("/api/auth/login", json={"phone": phone, "password": password})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 

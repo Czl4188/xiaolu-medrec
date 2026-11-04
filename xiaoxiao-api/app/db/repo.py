@@ -10,7 +10,7 @@ from sqlalchemy import String, cast, delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.crypto import encrypt
+from app.core.crypto import encrypt, normalize_phone, phone_digest
 from app.db.models import Job, Profile, Record, Run, Session, Step, ToolCall, TokenUsage, User
 
 
@@ -19,20 +19,59 @@ def get_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
 
 
+def get_user_by_phone(db: Session, phone: str) -> User | None:
+    digest = phone_digest(phone)
+    if not digest:
+        return None
+    return db.scalar(select(User).where(User.phone_hash == digest))
+
+
+def get_legacy_users_by_username(db: Session, username: str) -> list[User]:
+    """还没绑手机号的老账号。
+
+    新账号一律有手机号，所以这里过滤 phone_hash IS NULL 之后，
+    即使新账号取了同名用户名，也不会和可登录的老账号混在一起。
+    """
+    rows = db.scalars(
+        select(User).where(User.username == username, User.phone_hash.is_(None))
+    ).all()
+    return list(rows)
+
+
 def get_user(db: Session, user_id: str) -> User | None:
     return db.get(User, user_id)
 
 
-def create_user(db: Session, username: str, password_hash: str) -> User:
-    user = User(username=username, password_hash=password_hash, display_name=username)
+def create_user(db: Session, username: str, password_hash: str, phone: str = "") -> User:
+    normalized = normalize_phone(phone)
+    user = User(
+        username=username,
+        password_hash=password_hash,
+        display_name=username,
+        phone_hash=phone_digest(normalized) or None,
+        phone_enc=encrypt(normalized),
+    )
     db.add(user)
     try:
         db.flush()
-        db.add(Profile(user_id=user.id, name=username))
+        db.add(Profile(user_id=user.id, name=username, phone_enc=encrypt(normalized)))
         db.commit()
     except IntegrityError:
         db.rollback()
         raise
+    db.refresh(user)
+    return user
+
+
+def set_user_phone(db: Session, user: User, phone: str) -> User:
+    """绑定或更换登录手机号；profile 同步一份，保证资料页显示一致。"""
+    normalized = normalize_phone(phone)
+    user.phone_hash = phone_digest(normalized) or None
+    user.phone_enc = encrypt(normalized)
+    profile = db.get(Profile, user.id)
+    if profile is not None:
+        profile.phone_enc = encrypt(normalized)
+    db.commit()
     db.refresh(user)
     return user
 

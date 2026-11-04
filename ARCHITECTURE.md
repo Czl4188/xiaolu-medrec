@@ -181,11 +181,19 @@ flowchart TD
 
 ---
 
+### 账号与登录
+
+- **登录身份是手机号**，用户名只是显示名，允许重名。两个人可以都叫「张三」，是两个互不可见的账号。
+- 手机号不落明文：`phone_hash = HMAC-SHA256(secret_key, 11 位号码)` 建唯一索引用于查找，`phone_enc` 存密文用于回显给本人。换 `secret_key` 会让旧摘要失配，只能重新绑定。
+- 老库升级由 `app/db/migrate.py` 完成：补 `phone_hash` / `phone_enc`，**把 `ix_users_username` 从唯一索引改成普通索引**（否则第二个同名账号 500），再给 `phone_hash` 建唯一索引。
+- 老账号（`phone_hash IS NULL`）仍可用用户名登录；登录后在「我的 → 账号与安全」绑定手机号，之后两种方式都能进。
+- 前端本地缓存按 **账号标识** 分区（服务端 `id:<user.id>`，本机 `p:<手机号>`），不再用用户名，否则同名账号会共用头像、身份证、主题。旧键数据首次登录时一次性迁移（`lx_keys_v2_*` 标记）。
+
 ## 5. 数据模型
 
 | 表 | 用途 | 关键字段 |
 | --- | --- | --- |
-| `users` | 账号 | `username` 唯一、`password_hash` |
+| `users` | 账号 | `phone_hash` 唯一（手机号摘要，登录用）、`phone_enc` 密文、`username` 可重复（显示名）、`password_hash` |
 | `sessions` | 服务端会话 | `token_hash` 主键、`expires_at` |
 | `profiles` | 个人资料 | `phone_enc` / `idcard_enc` 密文 |
 | `records` | 就诊记录 | `user_id`、`visit_at`、`meds`(JSON)、`conditions`、`discontinued` |
@@ -202,10 +210,11 @@ flowchart TD
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/ping` | 前端探测后端是否可用 |
-| POST | `/api/auth/register` | 注册 |
-| POST | `/api/auth/login` | 登录 |
+| POST | `/api/auth/register` | 注册：用户名 + 手机号 + 密码 |
+| POST | `/api/auth/login` | 登录：`phone`；老账号可用 `username` |
 | GET | `/api/me` | 当前用户 |
-| GET/PUT | `/api/me/profile` | 资料读取/保存（手机号、身份证解密返回） |
+| GET/PUT | `/api/me/profile` | 资料读取/保存（手机号只读回显，身份证解密返回） |
+| POST | `/api/me/phone` | 绑定 / 更换登录手机号，需验密码 |
 | POST | `/api/me/password` | 改密码，吊销其它会话 |
 | DELETE | `/api/me` | 注销，需再次输入密码 |
 | GET/POST | `/api/records` | 列表 / 新建 |
