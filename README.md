@@ -45,12 +45,30 @@
 │   ├── .env.example
 │   └── README.md
 ├── xiaoxiao-medrec/          # 可安装的 WorkBuddy Skill
+├── qrcode.png                # 手机访问二维码（指向在线版）
 ├── ARCHITECTURE.md           # 架构：模块、数据流、接口、关键取舍
 ├── CONTRIBUTING.md           # 协作规则：分支、提交、测试、安全红线
 ├── 小鹿Agent严格复审整改说明.md
 ├── 小鹿Agent双视角测试评估.md
 └── 小鹿Agent资料同步与模型接入.md
 ```
+
+---
+
+## 手机访问
+
+用手机扫描仓库根目录的 [`qrcode.png`](qrcode.png) 即可打开在线版：
+
+https://xiaolu-medrec-86641.app.workbuddy.host/?sharecode=QUR3DXNVSL
+
+线上跑的是**纯静态的本机模式**（没有后端），所以有几条要知道：
+
+- 病历只存在手机浏览器的 `localStorage` 里，不上传服务器；清除浏览器数据即全部丢失，换手机看不到旧记录
+- 语音转写要求 https 与 Chrome / Edge；Safari、Firefox 会降级成手动输入
+- 拍照识药需要在页面里自行填写千问接口地址与 Key，Key 存在该账号的本地存储里
+
+> **改了 `xiaoxiao-ai/app.html` 之后，线上页面不会自动更新。** 发布平台托管的是上传时刻的副本，
+> 需要重新发布一次才会生效；只要发布到同一个应用，链接和二维码都保持不变，不用重新做码。
 
 ---
 
