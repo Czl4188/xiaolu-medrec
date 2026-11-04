@@ -81,6 +81,10 @@ class Settings(BaseSettings):
     asr_model: str = "whisper-1"
     # 语音转写走「能听音频的对话模型」：和文本模型共用 base_url / key
     asr_chat_model: str = "qwen3.8-omni-flash"
+    # 说话人分离：走 DashScope 非实时转写（异步任务），和聊天模型分开配置
+    asr_diarize_base: str = "https://dashscope.aliyuncs.com"
+    asr_diarize_model: str = "qwen-audio-3.0-asr-flash-filetrans"
+    asr_diarize_timeout: float = 75.0
 
     # —— 任务 ——
     job_poll_interval: float = 1.0

@@ -245,9 +245,16 @@ flowchart TD
 | POST | `/api/ai/chat` | 文本模型代理 |
 | POST | `/api/ai/vision` | 识图代理 |
 | POST | `/api/ai/asr` | 语音转写：data URL 音频 → 文字（qwen omni，单次 ≤ 约 9MB） |
+| POST | `/api/ai/asr/speakers` | 说话人分离转写：返回 `segments[{speaker,text,begin,end}]`，按「医生 / 患者」分行 |
 | GET | `/healthz` `/readyz` | 存活 / 就绪 |
 
 鉴权统一用 `X-Xiaolu-Token`。
+
+**录音转写链路**：`/api/ai/asr/speakers` 把音频传到 DashScope 临时存储，提交非实时转写任务
+（`qwen-audio-3.0-asr-flash-filetrans`，`diarization_enabled=true`、`speaker_count=2`），
+轮询拿到带 `speaker_id` 的句子；再用文本模型判断哪位是医生，失败时退回关键词规则
+（开药/检查/复诊 vs 描述症状/以「医生」开头）。相邻同角色的句子会合并成一段。
+模型不可用或超时，前端自动退回 `/api/ai/asr` 普通转写；两边都失败才用浏览器实时结果。
 
 ---
 
@@ -298,5 +305,5 @@ Key 不进浏览器，换设备不用重填，也能统一限流和换模型。
 
 - 不做诊断、处方、用药建议；问答只复述档案
 - 不做服药打卡与提醒（产品边界是「档案」）
-- 不保存音频，只保留转写文本
+- 服务端不长期保存音频：转写时音频经 DashScope 临时存储（48 小时自动清理），只把转写文本写进档案
 - 不把患者数据用于训练
