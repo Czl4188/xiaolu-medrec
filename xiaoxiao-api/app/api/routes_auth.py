@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -53,8 +55,13 @@ def register(body: RegisterIn, db: Session = Depends(get_db)) -> TokenOut:
 
 @router.post("/login", response_model=TokenOut, dependencies=[Depends(_auth_limit)])
 def login(body: LoginIn, db: Session = Depends(get_db)) -> TokenOut:
-    if body.phone:
-        user = repo.get_user_by_phone(db, body.phone)
+    # 兼容旧页面：它们把手机号填在「用户名」栏里发过来。
+    # 只对「长得像手机号」的输入生效，不影响老账号用用户名登录。
+    looks_like_phone = bool(re.fullmatch(r"1[3-9]\d{9}", body.username or ""))
+    phone = body.phone or (body.username if looks_like_phone else "")
+
+    if phone:
+        user = repo.get_user_by_phone(db, phone)
         # 统一话术，避免通过错误信息枚举用户
         if not user or not verify_password(body.password, user.password_hash):
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "手机号或密码不正确")

@@ -896,3 +896,12 @@ def test_import_records_into_existing_account(client):
             assert db.get(User, target_id) is not None
     finally:
         settings.admin_token = saved
+
+
+def test_login_accepts_phone_typed_into_username_field(client):
+    """旧页面把手机号填在「用户名」栏：服务端要当成手机号处理。"""
+    phone = "138" + f"{uuid.uuid4().int % 10**8:08d}"
+    assert _reg(client, "旧页面兼容", phone).status_code == 200
+    r = client.post("/api/auth/login", json={"username": phone, "password": "pass12345"})
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["phone"] == phone

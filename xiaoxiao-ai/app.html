@@ -295,6 +295,10 @@ select.field__in{appearance:none;background-image:linear-gradient(45deg,transpar
   border-top:1px solid var(--rule);font-family:var(--font-mono);font-size:9.5px;
   letter-spacing:.1em;color:var(--muted);text-transform:uppercase;
 }
+.gate__ver{
+  margin:8px 0 0;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;
+  color:var(--muted);opacity:.75;
+}
 
 /* ————————————————— 5. 骨架 ————————————————— */
 #app{position:relative;z-index:1;min-height:100dvh;display:flex;flex-direction:column}
@@ -1183,9 +1187,10 @@ body[data-view="ask"] #app{height:100dvh}
     </form>
 
     <div class="gate__foot">
-      <span id="gateFootA">首次使用请勾选创建</span>
+      <span id="gateFootA">手机号 + 密码登录</span>
       <span id="gateFootB">登录后显示存储位置</span>
     </div>
+    <p class="gate__ver" id="gateVer">v4 · 2026-11-04 · 手机号登录</p>
   </div>
 </div>
 
