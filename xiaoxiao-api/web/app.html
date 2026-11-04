@@ -656,8 +656,12 @@ body[data-view="ask"] #app{height:100dvh}
 .file-meta{margin:0 0 8px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.03em;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
 
 .transcript{display:grid;gap:6px;max-height:214px;overflow-y:auto;padding-right:2px;margin-bottom:4px}
+#trMeta:empty{display:none}
 .tr-line{display:grid;grid-template-columns:50px minmax(0,1fr);gap:8px;margin:0;font-size:12.5px;line-height:1.8;max-width:none}
 .tr-ts{font-family:var(--font-mono);font-size:9px;color:var(--muted);padding-top:4px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.tr-sp{font-family:var(--font-body);font-size:10px;font-weight:600;letter-spacing:0;padding-top:2px}
+.tr-sp--doc{color:var(--accent)}
+.tr-sp--pat{color:var(--muted)}
 .tr-tx{color:var(--ink-2);overflow-wrap:anywhere}
 .tr-line--interim .tr-tx{color:var(--muted);font-style:italic}
 
@@ -729,6 +733,21 @@ body[data-view="ask"] #app{height:100dvh}
 .rx-name{font-family:var(--font-display);font-weight:700;font-size:12.5px;line-height:1.5;letter-spacing:0}
 .rx-meta{font-family:var(--font-mono);font-size:10px;color:var(--ink-2);letter-spacing:.02em;margin-top:2px;display:flex;flex-wrap:wrap;gap:8px}
 .rx-meta span{white-space:nowrap}
+
+/* 每日用药提醒 */
+.rm-head{display:flex;justify-content:space-between;gap:8px;margin:0 0 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.rm-list .rx-item{grid-template-columns:18px minmax(0,1fr);column-gap:10px}
+.rm-by{margin:8px 0 0;font-size:10.5px;line-height:1.7;color:var(--muted)}
+.rm-bar{
+  position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;
+  display:flex;align-items:center;gap:10px;width:calc(100% - 24px);max-width:420px;
+  padding:10px 12px;border:1px solid var(--accent);border-radius:var(--r-sm);
+  background:var(--paper);box-shadow:0 6px 24px rgba(0,0,0,.16);
+}
+.rm-bar__txt{flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--ink)}
+.rm-bar__txt b{display:block;font-family:var(--font-display);font-size:13px;margin-bottom:1px}
+.rm-bar__txt span{color:var(--ink-2)}
+.rm-bar__acts{display:flex;gap:6px;flex:none}
 
 /* 档案概览 */
 .ov{display:grid;gap:0}
@@ -1190,12 +1209,15 @@ body[data-view="ask"] #app{height:100dvh}
       <span id="gateFootA">手机号 + 密码登录</span>
       <span id="gateFootB">登录后显示存储位置</span>
     </div>
-    <p class="gate__ver" id="gateVer">v4 · 2026-11-04 · 手机号登录</p>
+    <p class="gate__ver" id="gateVer">v5 · 2026-11-04 · 手机号登录</p>
   </div>
 </div>
 
 <!-- ——————————————— 应用 ——————————————— -->
 <div id="app" hidden>
+
+  <!-- 到点提醒：页面开着时浮在最上层，不挡住下面的操作 -->
+  <div class="rm-bar" id="rmBar" hidden role="status" aria-live="polite"></div>
 
   <header class="appbar">
     <div class="appbar__left">
@@ -1531,10 +1553,8 @@ body[data-view="ask"] #app{height:100dvh}
           </span>
         </button>
         <div class="panel__body">
-          <p class="file-meta" id="trMeta">未开始 · 浏览器端转写</p>
-          <div class="transcript" id="transcript">
-            <p class="empty">点上面的「开始录音」，你说的话会一段段落在这里。录音会发到服务端转成文字，转写只存进你的档案。</p>
-          </div>
+          <p class="file-meta" id="trMeta"></p>
+          <div class="transcript" id="transcript"></div>
 
           <div class="manual">
             <label class="sr-only" for="manualText">手动输入问诊内容</label>
@@ -1577,10 +1597,27 @@ body[data-view="ask"] #app{height:100dvh}
         <div class="panel__body" id="todayRx">
           <p class="empty">还没有用药记录。录一次会诊，医生说的药会按「名称 · 剂量 · 服法 · 天数」列在这里。</p>
         </div>
-        <p class="rx-note">只复述医嘱，不做服药打卡。过敏史跨记录汇总。</p>
+        <p class="rx-note">只复述医嘱，不替你判断吃不吃。过敏史跨记录汇总。</p>
         <div class="panel__foot">
           <span class="tag" id="rxAllergy">无过敏记录</span>
           <span class="meta" id="rxSource">—</span>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="每日用药提醒">
+        <div class="panel__head">
+          <span class="meta">每日用药提醒</span>
+          <span class="meta" id="remindTag">—</span>
+        </div>
+        <div class="panel__body" id="remindList">
+          <p class="empty">还没有可提醒的用药。录一次会诊，会按医嘱频次和复诊日生成每日提醒。</p>
+        </div>
+        <p class="rx-note" id="remindNote">
+          提醒只在你手机上生成，不上传；页面开着才会响，关着也想提醒就导出到手机日历。
+        </p>
+        <div class="panel__foot" style="flex-wrap:wrap">
+          <button class="btn btn--ghost btn--mini" type="button" id="rmToggle">开启页内提醒</button>
+          <button class="btn btn--ghost btn--mini" type="button" id="rmIcs">加到手机日历</button>
         </div>
       </section>
 
@@ -1853,7 +1890,8 @@ body[data-view="ask"] #app{height:100dvh}
     records: function () { return 'lx_records_v1_' + acctKey(); },
     theme: function () { return 'lx_theme_v1_' + acctKey(); },   // 账号隔离的主题
     ai: function () { return 'lx_ai_v1_' + acctKey(); },         // 账号隔离的千问配置
-    scan: function () { return 'lx_scan_v1_' + acctKey(); }       // 账号隔离的识药记录
+    scan: function () { return 'lx_scan_v1_' + acctKey(); },      // 账号隔离的识药记录
+    remind: function () { return 'lx_remind_v1_' + acctKey(); }   // 账号隔离的用药提醒设置与打卡
   };
 
   /* 用手机号登录后，用户名不再唯一；表单按模式显示不同字段 */
@@ -1904,7 +1942,7 @@ body[data-view="ask"] #app{height:100dvh}
     var flag = 'lx_keys_v2_' + acct;
     try {
       if (localStorage.getItem(flag)) return;
-      ['lx_user_v1_', 'lx_records_v1_', 'lx_theme_v1_', 'lx_ai_v1_', 'lx_scan_v1_', 'lx_cal_v1_']
+      ['lx_user_v1_', 'lx_records_v1_', 'lx_theme_v1_', 'lx_ai_v1_', 'lx_scan_v1_', 'lx_cal_v1_', 'lx_remind_v1_']
         .forEach(function (pre) {
           var from = pre + name, to = pre + acct;
           var old = localStorage.getItem(from);
@@ -2497,6 +2535,7 @@ body[data-view="ask"] #app{height:100dvh}
           localStorage.removeItem(LS.theme());
           localStorage.removeItem(LS.ai());
           localStorage.removeItem(LS.scan());
+          localStorage.removeItem(LS.remind());
           localStorage.removeItem('lx_cal_v1_' + state.acct);
           localStorage.removeItem('lx_keys_v2_' + state.acct);
           localStorage.removeItem(LS.session);
@@ -2633,7 +2672,10 @@ body[data-view="ask"] #app{height:100dvh}
       if (API.on) {
         cloudLogin({
           isNew: isNew, username: regName, phone: phone,
-          legacy: legacyName, password: p
+          /* 只有真的切到「用户名登录」才走老通道；隐藏栏里被密码管理器自动填了
+             旧用户名时，不能把手机号登录顶掉 */
+          legacy: gateMode === 'user' ? legacyName : '',
+          password: p
         }, err);
         return;
       }
@@ -2776,6 +2818,7 @@ body[data-view="ask"] #app{height:100dvh}
     state.acct = acct || ('u:' + name);
     migrateLocalKeys(state.acct, name);
     loadLocalAccount(name);
+    rmStart();          // 用药提醒：读本机设置并开始到点检查
 
     if (API.on) {
       /* 头像与身份证明明只存本机，读服务端资料时不能把它们覆盖掉 */
@@ -3904,6 +3947,7 @@ body[data-view="ask"] #app{height:100dvh}
     if (mode) mode.textContent = API.on ? '服务端' : '本机';
     renderOverview();
     renderRx();
+    renderRemind();
     renderRecordPanel();
   }
 
@@ -4527,30 +4571,47 @@ body[data-view="ask"] #app{height:100dvh}
     });
   }
 
-  /* 浏览器转写 + 千问转写取更完整的一份；都没有就返回原文 */
+  /* 录音结束后先试「说话人分离」，失败再退回普通转写；都没有就用浏览器实时结果 */
   function refineRecordingText(browserText) {
     return stopAudioCapture().then(function (blob) {
       if (!blob || !API.on || blob.size < 2000) return browserText;
       if (blob.size > 7 * 1024 * 1024) return browserText;
       return blobToDataURL(blob).then(function (url) {
-        return apiFetch('/api/ai/asr', {
-          method: 'POST', body: { audio: url }, timeoutMs: 90000
+        return apiFetch('/api/ai/asr/speakers', {
+          method: 'POST', body: { audio: url }, timeoutMs: 120000
+        }).then(function (res) {
+          var segs = (res && res.segments) || [];
+          if (!segs.length) throw new Error('没有分出说话人');
+          state.lines = segs.map(function (s) {
+            return { t: Date.now(), text: s.text, sp: s.speaker === '医生' ? '医生' : '患者' };
+          });
+          renderTranscript();
+          var labeled = segs.map(function (s) {
+            return (s.speaker === '医生' ? '医生' : '患者') + '：' + s.text;
+          }).join('\n');
+          var docs = segs.filter(function (s) { return s.speaker === '医生'; }).length;
+          toast(docs ? '已按说话人分开：医生 ' + docs + ' 段' : '已按说话人分行');
+          return labeled;
+        }).catch(function () {
+          return apiFetch('/api/ai/asr', {
+            method: 'POST', body: { audio: url }, timeoutMs: 90000
+          }).then(function (res) {
+            var t = clean(res && res.text);
+            if (!t || t.length < 4) return browserText;
+            if (!browserText) {
+              state.lines = [{ t: Date.now(), text: t }];
+              renderTranscript();
+              return t;
+            }
+            if (t.length >= browserText.length * 0.6) {
+              state.lines = [{ t: Date.now(), text: t }];
+              renderTranscript();
+              toast('转写已用千问校对');
+              return t;
+            }
+            return browserText;
+          });
         });
-      }).then(function (res) {
-        var t = clean(res && res.text);
-        if (!t || t.length < 4) return browserText;
-        if (!browserText) {
-          state.lines = [{ t: Date.now(), text: t }];
-          renderTranscript();
-          return t;
-        }
-        if (t.length >= browserText.length * 0.6) {
-          state.lines = [{ t: Date.now(), text: t }];
-          renderTranscript();
-          toast('转写已用千问校对');
-          return t;
-        }
-        return browserText;
       });
     }).catch(function () {
       return browserText;
@@ -4572,11 +4633,14 @@ body[data-view="ask"] #app{height:100dvh}
     var box = $('#transcript');
     if (!box) return;
     if (!state.lines.length && !state.interim) {
-      box.innerHTML = '<p class="empty">点上面的「开始录音」，你说的话会一段段落在这里。录音会发到服务端转成文字，转写只存进你的档案。</p>';
+      box.innerHTML = '';
       return;
     }
     var html = state.lines.map(function (l) {
-      return '<p class="tr-line"><span class="tr-ts">' + fmtClock(l.t) + '</span>' +
+      var who = l.sp
+        ? '<span class="tr-ts tr-sp ' + (l.sp === '医生' ? 'tr-sp--doc' : 'tr-sp--pat') + '">' + esc(l.sp) + '：</span>'
+        : '<span class="tr-ts">' + fmtClock(l.t) + '</span>';
+      return '<p class="tr-line">' + who +
         '<span class="tr-tx">' + esc(l.text) + '</span></p>';
     }).join('');
     if (state.interim) {
@@ -4944,9 +5008,11 @@ body[data-view="ask"] #app{height:100dvh}
 
     var seq = ++extractSeq;
     var draft = makeDraft(text, mode);
+    /* 角色标签只用于阅读与转写展示，抽字段时去掉，免得「医生：」混进注意事项 */
+    var plain = String(text || '').replace(/^(医生|患者|家属|护士)\s*[：:]\s*/gm, '');
     state.draft = draft;
 
-    if (!API.on) applyLocalExtract(draft, extract(text));
+    if (!API.on) applyLocalExtract(draft, extract(plain));
 
     renderRecordPanel();
 
@@ -4955,7 +5021,7 @@ body[data-view="ask"] #app{height:100dvh}
 
     /* 不再把整段原文塞进聊天输入框；需要时在记录卡上点「用这段问小鹿」 */
     if (API.on) {
-      apiFetch('/api/records/extract', { method: 'POST', body: { text: text } })
+      apiFetch('/api/records/extract', { method: 'POST', body: { text: plain } })
         .then(function (x) {
           /* 迟到的响应不得覆盖新草稿 */
           if (state.draft !== draft || seq !== extractSeq) return;
@@ -5412,9 +5478,7 @@ body[data-view="ask"] #app{height:100dvh}
   function greet() {
     addBot([
       { h: '我在。我是小鹿——只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。',
-        t: '我在。我是小鹿，只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。' },
-      { h: '想记录，去「记录」页点右上「开始录音」，或把问诊内容贴进「手动整理」。想问档案里的旧事，就在这一页直接问。看不清药盒，去「识药」拍一张。',
-        t: '想记录，去记录页点右上开始录音，或把问诊内容贴进手动整理。想问档案里的旧事，就在这一页直接问。看不清药盒，去识药拍一张。' }
+        t: '我在。我是小鹿，只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。' }
     ], [], false);
   }
 
@@ -6278,38 +6342,12 @@ body[data-view="ask"] #app{height:100dvh}
     return d;
   }
 
-  function medTimeFor(med) {
-    var timing = String((med && med.timing) || '');
-    if (/睡前/.test(timing)) return '21:30';
-    if (/空腹/.test(timing) && CAL.time === '08:00') return '07:00';
-    return CAL.time;
-  }
-
+  /* 一次记录 → 日程：每味药每个时间点各一条，日重复到复诊日为止。
+     写在设置里的「提醒时间」作为整张表的基准（默认 08:00）。 */
   function buildCalEvents(draft) {
-    var out = [];
-    if (!draft) return out;
+    if (!draft) return [];
+    var out = rmEvents(rmPlan(draft));
     var base = draft.at || Date.now();
-    var today = new Date();
-    today.setHours(0, 0, 0, 0);
-    var startBase = new Date(Math.max(base, today.getTime()));
-
-    (draft.meds || []).forEach(function (m) {
-      if (!m || !m.name) return;
-      var days = parseInt(String(m.days || '').replace(/[^\d]/g, ''), 10);
-      var count = days > 0 ? Math.min(days, 90) : 1;
-      var start = calTimeToDate(startBase, medTimeFor(m));
-      out.push({
-        title: '吃药：' + m.name + (m.dose ? ' ' + m.dose : ''),
-        desc: [m.freq, m.timing, days ? '共 ' + days + ' 天' : '记录里没写疗程']
-          .filter(Boolean).join(' · ') + '。来自小鹿病历记录。',
-        start: start,
-        minutes: 15,
-        rrule: 'FREQ=DAILY;COUNT=' + count,
-        when: fmtDate(start.getTime()) + ' ' + fmtTime(start.getTime()) +
-          ' 起 · 每天 · ' + (days ? days + ' 天' : '1 天')
-      });
-    });
-
     var fu = followUpDate(draft.followUp, base);
     if (fu) {
       var d = new Date(fu);
@@ -6400,6 +6438,399 @@ body[data-view="ask"] #app{height:100dvh}
       try { URL.revokeObjectURL(url); } catch (e) {}
       if (a.parentNode) a.parentNode.removeChild(a);
     }, 1500);
+  }
+
+  /* ============================================================
+     每日用药提醒
+     把医嘱折成「每天哪些时间点什么药」，一直提醒到复诊日。
+     只在本机提醒（页内横幅 / 系统通知 / 导出到手机日历），
+     不判断该不该吃，打卡记录也不上传服务端。
+     ============================================================ */
+  var RM = { on: false, log: {}, timer: 0, fired: {}, bound: false };
+  var RM_FALLBACK_DAYS = 7;   // 既没写复诊日、也没写疗程时，先提醒一周
+  var RM_SLOTS = {
+    1: ['08:00'],
+    2: ['08:00', '20:00'],
+    3: ['08:00', '13:00', '19:00'],
+    4: ['08:00', '12:00', '17:00', '22:00']
+  };
+
+  function rmToday0() { var d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  function rmDayKey(ts) {
+    var d = new Date(ts == null ? Date.now() : ts);
+    return '' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+  }
+
+  function rmLoad() {
+    var c = read(LS.remind(), null);
+    if (c && typeof c === 'object') {
+      RM.on = !!c.on;
+      RM.log = (c.log && typeof c.log === 'object') ? c.log : {};
+    } else {
+      RM.on = false; RM.log = {};
+    }
+  }
+  function rmSave() {
+    if (!acctKey()) return;
+    var keys = Object.keys(RM.log).sort();
+    while (keys.length > 30) { delete RM.log[keys.shift()]; }   // 只留 30 天，别把本地存储撑爆
+    write(LS.remind(), { on: RM.on, log: RM.log });
+  }
+
+  /* 「设置」里的提醒时间决定整张表往前后挪多少，默认 08:00 */
+  function rmBaseShift() {
+    var p = String((CAL && CAL.time) || '08:00').split(':');
+    var mins = (+p[0] || 8) * 60 + (+p[1] || 0);
+    return mins - 8 * 60;
+  }
+
+  /* 频次 → 每天几次：「每日三次」「一天两次」「每晚」都认，认不出按一次 */
+  function rmPerDay(med) {
+    var freq = clean(med && med.freq);
+    if (/每晚|每夜/.test(freq)) return 1;
+    var m = freq.match(/([一二两三四1-4])\s*次/);
+    if (m) {
+      var n = cnNum(m[1]);
+      if (isFinite(n) && n >= 1 && n <= 4) return n;
+    }
+    return 1;
+  }
+
+  function rmShift(hhmm, mins) {
+    var p = String(hhmm).split(':');
+    var total = (+p[0] || 0) * 60 + (+p[1] || 0) + mins;
+    total = ((total % 1440) + 1440) % 1440;
+    return pad(Math.floor(total / 60)) + ':' + pad(total % 60);
+  }
+
+  /* 一天里的时间点：频次定几个，服法定早晚；空腹提前一小时，饭后推后半小时 */
+  function rmTimesFor(med) {
+    var timing = clean(med && med.timing);
+    var freq = clean(med && med.freq);
+    var slots;
+    if (/睡前|每晚|每夜/.test(timing) || /每晚|每夜/.test(freq)) {
+      slots = ['21:30'];
+    } else if (/每早|晨起|清晨/.test(timing)) {
+      slots = ['07:00'];
+    } else {
+      slots = RM_SLOTS[rmPerDay(med)].slice();
+      if (/空腹/.test(timing)) slots = slots.map(function (t) { return rmShift(t, -60); });
+    }
+    if (/饭后|餐后/.test(timing)) slots = slots.map(function (t) { return rmShift(t, 30); });
+    var shift = rmBaseShift();
+    if (shift) slots = slots.map(function (t) { return rmShift(t, shift); });
+    return slots;
+  }
+
+  /* 提醒计划：提醒到哪天 + 每天哪些时间点。复诊日优先，其次疗程，最后兜底一周 */
+  function rmPlan(rec) {
+    if (!rec) return null;
+    var base = rec.at || Date.now();
+    var start0 = new Date(base); start0.setHours(0, 0, 0, 0);
+    var fu = followUpDate(rec.followUp, base);
+    var maxDays = 0;
+    (rec.meds || []).forEach(function (m) {
+      var d = parseInt(String((m && m.days) || '').replace(/[^\d]/g, ''), 10);
+      if (d > maxDays) maxDays = d;
+    });
+
+    var until = null, label = '', src = '';
+    if (fu) {
+      var f = new Date(fu); f.setHours(23, 59, 59, 0);
+      if (f.getTime() >= rmToday0()) {
+        until = f;
+        label = '到 ' + fmtDate(fu) + ' 复诊';
+        src = 'follow';
+      }
+    }
+    if (!until && maxDays) {
+      var e = new Date(start0); e.setDate(e.getDate() + maxDays - 1); e.setHours(23, 59, 59, 0);
+      if (e.getTime() >= rmToday0()) {
+        until = e;
+        label = '到 ' + fmtDate(e.getTime()) + '（疗程 ' + maxDays + ' 天）';
+        src = 'days';
+      }
+    }
+    if (!until) {
+      var d2 = new Date(start0); d2.setDate(d2.getDate() + RM_FALLBACK_DAYS - 1);
+      d2.setHours(23, 59, 59, 0);
+      until = d2;
+      label = '先提醒 ' + RM_FALLBACK_DAYS + ' 天（没写复诊日）';
+      src = 'fallback';
+    }
+
+    var doses = [];
+    (rec.meds || []).forEach(function (m, mi) {
+      if (!m || !m.name) return;   // 没抽到药名的不猜，跟抽取器一个原则
+      rmTimesFor(m).forEach(function (t) {
+        doses.push({
+          key: (rec.id || 'r') + '|' + mi + '|' + t,
+          name: m.name,
+          dose: m.dose || '',
+          time: t
+        });
+      });
+    });
+    doses.sort(function (a, b) { return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0); });
+
+    return { rec: rec, until: until, label: label, src: src, days: maxDays, doses: doses };
+  }
+
+  /* 当前生效的那一份：最近一次有用药、且提醒还没结束的记录 */
+  function rmActivePlan() {
+    var recs = sortedDesc();
+    for (var i = 0; i < recs.length; i++) {
+      if (!(recs[i].meds || []).length) continue;
+      var p = rmPlan(recs[i]);
+      if (p && p.doses.length && p.until.getTime() >= rmToday0()) return p;
+    }
+    return null;
+  }
+  function rmLastPlan() {
+    var recs = sortedDesc().filter(function (r) { return (r.meds || []).length; });
+    return recs.length ? rmPlan(recs[0]) : null;
+  }
+
+  function rmTaken(day, key) { return !!(RM.log[day] && RM.log[day][key]); }
+  function rmSetTaken(day, key, on) {
+    RM.log[day] = RM.log[day] || {};
+    if (on) RM.log[day][key] = 1; else delete RM.log[day][key];
+    rmSave();
+  }
+
+  /* 导出用：每味药每个时间点一条，日重复到复诊日为止 */
+  function rmEvents(plan) {
+    var out = [];
+    if (!plan || !plan.doses.length) return out;
+    var untilUtc = new Date(plan.until.getTime())
+      .toISOString().replace(/\.\d{3}Z$/, 'Z').replace(/[-:]/g, '');
+    var visit0 = new Date(plan.rec.at || Date.now()).setHours(0, 0, 0, 0);
+    var start0 = Math.max(rmToday0(), visit0);
+    if (plan.until.getTime() < start0) return out;   // 已经结束的别再生成日程
+    plan.doses.forEach(function (d) {
+      out.push({
+        title: '吃药：' + d.name + (d.dose ? ' ' + d.dose : ''),
+        desc: '每天 ' + d.time + '，' + plan.label + '。只复述医嘱，来自小鹿病历记录。',
+        start: calTimeToDate(start0, d.time),
+        minutes: 10,
+        rrule: 'FREQ=DAILY;UNTIL=' + untilUtc,
+        when: '每天 ' + d.time + ' · ' + plan.label
+      });
+    });
+    return out;
+  }
+
+  function rmShowBar(plan, due) {
+    var bar = $('#rmBar');
+    if (!bar) return;
+    /* 同一味药一天几顿都在待办里时只写一次药名，时间点另列 */
+    var names = [];
+    due.forEach(function (d) {
+      var label = d.name + (d.dose ? ' ' + d.dose : '');
+      if (names.indexOf(label) < 0) names.push(label);
+    });
+    var times = due.map(function (d) { return d.time; });
+    bar.innerHTML =
+      '<div class="rm-bar__txt"><b>该吃药了</b><span>' + esc(names.join('、')) + ' · ' +
+        esc(times.join('、')) + ' · ' + esc(plan.label) + '</span></div>' +
+      '<div class="rm-bar__acts">' +
+        '<button class="btn btn--primary btn--mini" type="button" data-rm="ok">知道了</button>' +
+        '<button class="btn btn--ghost btn--mini" type="button" data-rm="later">稍后</button>' +
+      '</div>';
+    bar.setAttribute('data-keys', due.map(function (d) { return d.key; }).join('||'));
+    bar.hidden = false;
+  }
+
+  function rmBindBar() {
+    var bar = $('#rmBar');
+    if (!bar || bar.getAttribute('data-bound')) return;
+    bar.setAttribute('data-bound', '1');
+    bar.addEventListener('click', function (e) {
+      var el = e.target;
+      while (el && el !== bar && !el.getAttribute('data-rm')) el = el.parentNode;
+      var act = el && el !== bar ? el.getAttribute('data-rm') : '';
+      if (!act) return;
+      if (act === 'ok') {
+        var keys = String(bar.getAttribute('data-keys') || '').split('||').filter(Boolean);
+        keys.forEach(function (k) { rmSetTaken(rmDayKey(), k, true); });
+        toast('这一顿今天不再提醒。');
+        renderRemind();
+      } else {
+        toast('稍后再提醒你。');
+      }
+      bar.hidden = true;
+    });
+  }
+
+  function rmNotify(plan, due) {
+    try {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      var body = due.map(function (d) { return d.name + (d.dose ? ' ' + d.dose : ''); }).join('、') +
+        '（' + due[0].time + '）';
+      new Notification('该吃药了 · 小鹿', { body: body + ' · ' + plan.label, tag: 'xiaolu-med' });
+      if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
+    } catch (e) {}
+  }
+
+  /* 页面开着时每 30 秒看一眼有没有到点还没打卡的 */
+  function rmCheck() {
+    if (!RM.on) return;
+    var app = $('#app');
+    if (!app || app.hidden) return;
+    var plan = rmActivePlan();
+    if (!plan) return;
+    var day = rmDayKey();
+    var now = new Date();
+    var hhmm = pad(now.getHours()) + ':' + pad(now.getMinutes());
+    var due = plan.doses.filter(function (d) {
+      return d.time <= hhmm && !rmTaken(day, d.key);
+    });
+    if (!due.length) return;
+    var sig = day + '|' + due[0].key;
+    if (RM.fired[sig]) return;      // 同一顿只提醒一次，别每分钟弹一遍
+    RM.fired[sig] = 1;
+    rmShowBar(plan, due);
+    rmNotify(plan, due);
+  }
+
+  function rmToggleOn() {
+    if (!acctKey()) return;
+    if (RM.on) {
+      RM.on = false;
+      rmSave();
+      var b = $('#rmBar'); if (b) b.hidden = true;
+      toast('已关闭页内提醒。导到手机日历的提醒不受影响。');
+      renderRemind();
+      return;
+    }
+    RM.on = true;
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch (e) {}
+    }
+    rmSave();
+    toast('已开启：页面开着时，到点会提醒你。');
+    renderRemind();
+    rmCheck();
+  }
+
+  function rmExport() {
+    var plan = rmActivePlan() || rmLastPlan();
+    if (!plan || !plan.doses.length) { toast('还没有可导出的用药提醒。'); return; }
+    if (plan.until.getTime() < rmToday0()) {
+      toast('这轮用药提醒已经结束了，等新的医嘱。');
+      return;
+    }
+    var events = rmEvents(plan);
+    var fu = followUpDate(plan.rec.followUp, plan.rec.at || Date.now());
+    if (fu) {
+      var d = new Date(fu); d.setHours(9, 0, 0, 0);
+      events.push({
+        title: '复诊' + (plan.rec.hospital ? '：' + plan.rec.hospital : ''),
+        desc: '上次就诊 ' + fmtDate(plan.rec.at) + '。来自小鹿病历记录。',
+        start: d,
+        minutes: 30,
+        alarm: '-P1D',
+        when: fmtDate(fu) + ' 09:00 · 提前一天提醒'
+      });
+    }
+    downloadICS(events, '用药提醒-' + fmtDate(plan.rec.at).replace(/\./g, ''));
+    toast('日程文件已生成，打开就能加进手机日历。');
+  }
+
+  function rmBindUI() {
+    var t = $('#rmToggle');
+    if (t && !t.getAttribute('data-bound')) {
+      t.setAttribute('data-bound', '1');
+      t.addEventListener('click', rmToggleOn);
+    }
+    var i = $('#rmIcs');
+    if (i && !i.getAttribute('data-bound')) {
+      i.setAttribute('data-bound', '1');
+      i.addEventListener('click', rmExport);
+    }
+  }
+
+  function renderRemind() {
+    var box = $('#remindList');
+    var tag = $('#remindTag');
+    var note = $('#remindNote');
+    var btn = $('#rmToggle');
+    if (!box) return;
+    rmBindUI();
+
+    var plan = state.records.length ? rmActivePlan() : null;
+    if (!plan) {
+      var lastP = rmLastPlan();
+      if (lastP && lastP.doses.length) {
+        box.innerHTML = '<p class="empty">上一轮用药提醒已结束（' +
+          esc(lastP.label) + '）。新的医嘱保存后会接上。</p>';
+        if (tag) tag.textContent = '已结束';
+      } else {
+        box.innerHTML = '<p class="empty">还没有可提醒的用药。录一次会诊，会按医嘱频次和复诊日生成每日提醒。</p>';
+        if (tag) tag.textContent = '—';
+      }
+      if (btn) { btn.disabled = true; btn.textContent = '开启页内提醒'; }
+      if (note) note.textContent = '提醒只在你手机上生成，不上传；页面开着才会响。';
+      var b0 = $('#rmBar'); if (b0) b0.hidden = true;
+      return;
+    }
+
+    var day = rmDayKey();
+    var marked = 0;
+    var rows = plan.doses.map(function (d) {
+      var isDone = rmTaken(day, d.key);
+      if (isDone) marked++;
+      var meta = [];
+      if (d.dose) meta.push(d.dose);
+      meta.push(d.time);
+      return '<div class="rx-item' + (isDone ? ' is-done' : '') + '">' +
+        '<button class="rx-check" type="button" aria-pressed="' + (isDone ? 'true' : 'false') + '"' +
+          ' data-rm-dose="' + esc(d.key) + '"' +
+          ' aria-label="' + esc(d.name + ' ' + d.time) + ' 这顿不再提醒"></button>' +
+        '<div><div class="rx-name">' + esc(d.name) + '</div>' +
+        '<div class="rx-meta">' + meta.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') +
+        '</div></div>' +
+      '</div>';
+    }).join('');
+
+    var left = plan.doses.length - marked;
+    box.innerHTML =
+      '<div class="rm-head"><span>每天 ' + plan.doses.length + ' 次</span>' +
+        '<span>今天还有 ' + left + ' 次待提醒</span></div>' +
+      '<div class="rm-list">' + rows + '</div>' +
+      '<p class="rm-by">勾掉只是让这一顿不再提醒，不是服药记录，也不上传。<br>' +
+        '出自 ' + esc(fmtDate(plan.rec.at)) + ' 那次医嘱 · ' + esc(plan.label) + '</p>';
+
+    if (tag) tag.textContent = plan.label;
+    if (btn) { btn.disabled = false; btn.textContent = RM.on ? '关闭页内提醒' : '开启页内提醒'; }
+    if (note) {
+      note.textContent = RM.on
+        ? '已开启：页面开着时到点提醒。想关了页面也提醒，就点「加到手机日历」。'
+        : '提醒只在你手机上生成，不上传；页面开着才会响，关着也想提醒就导出到手机日历。';
+    }
+
+    $$('#remindList [data-rm-dose]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var k = b.getAttribute('data-rm-dose');
+        rmSetTaken(day, k, !rmTaken(day, k));
+        renderRemind();
+      });
+    });
+  }
+
+  function rmStart() {
+    loadCal();      // 提醒时间基准来自「设置」
+    rmLoad();
+    rmBindBar();
+    if (!RM.bound) {
+      RM.bound = true;
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) rmCheck();
+      });
+    }
+    if (RM.timer) clearInterval(RM.timer);
+    RM.timer = setInterval(rmCheck, 30000);
+    setTimeout(rmCheck, 1500);
   }
 
   /* 我的 → 某条就诊记录：只把这一条的复诊/用药写成日程 */
