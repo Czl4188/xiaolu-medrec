@@ -6,6 +6,23 @@
 
 ---
 
+## 扫码使用
+
+![扫码使用小鹿](assets/qr-xiaolu-card.png)
+
+手机相机或微信扫一扫，登录后就能录音、整理和询问。
+
+- 二维码指向线上入口，**链接固定不变**：每次发布新版本后，扫码看到的都是最新版，不用重新做码。
+- 换域名时才需要重新生成（访问码通过环境变量传入，不写进仓库文本）：
+
+  ```bash
+  XIAOLU_URL="https://<域名>/app.html?sharecode=<访问码>" python scripts/make_qr.py
+  ```
+
+- 打印或贴纸用纯二维码：[assets/qr-xiaolu.png](assets/qr-xiaolu.png)。
+
+---
+
 ## 功能
 
 - **录音转写**：浏览器语音识别边说边转写，停下后再用千问转写校对一遍；也可以直接粘贴文字
@@ -44,6 +61,8 @@
 │   ├── web/                  # 部署时托管的前端副本
 │   ├── .env.example
 │   └── README.md
+├── assets/                   # 入口二维码（卡片 + 纯码）
+├── scripts/make_qr.py        # 重新生成二维码
 ├── xiaoxiao-medrec/          # 可安装的 WorkBuddy Skill
 ├── ARCHITECTURE.md           # 架构：模块、数据流、接口、关键取舍
 ├── CONTRIBUTING.md           # 协作规则：分支、提交、测试、安全红线
