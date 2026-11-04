@@ -1,0 +1,29 @@
+<view class="page">
+  <view class="state" wx:if="{{!logged}}">
+    还没有登录。登录后才能看到自己的档案。
+    <button class="btn btn--primary state__btn" bindtap="goLogin">手机号登录</button>
+  </view>
+
+  <block wx:else>
+    <view class="state" wx:if="{{loading}}">正在读取档案…</view>
+    <view class="state" wx:elif="{{error}}">
+      {{error}}
+      <button class="btn btn--ghost state__btn" bindtap="retry">重试</button>
+    </view>
+    <view class="empty" wx:elif="{{rows.length === 0}}">
+      还没有记录。网页版可以把问诊录音整理成档案，存好后这里就能看到。
+    </view>
+
+    <view class="list" wx:else>
+      <view class="item" wx:for="{{rows}}" wx:key="id" data-id="{{item.id}}" bindtap="openItem">
+        <view class="item__hd">
+          <text class="item__date">{{item.date}}</text>
+          <text class="item__badge" wx:if="{{item.medsCount > 0}}">{{item.medsCount}} 种药</text>
+        </view>
+        <text class="item__hosp">{{item.hospital}}</text>
+        <text class="item__sum">{{item.summary}}</text>
+        <text class="item__meds">{{item.medsText}}</text>
+      </view>
+    </view>
+  </block>
+</view>

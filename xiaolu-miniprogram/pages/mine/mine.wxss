@@ -1,0 +1,100 @@
+.state__btn {
+    margin-top: 32rpx;
+}
+
+.profile {
+    display: flex;
+    align-items: center;
+    gap: 24rpx;
+    padding: 16rpx 4rpx 32rpx;
+}
+
+.profile__deer {
+    width: 132rpx;
+    height: 132rpx;
+    border-radius: 32rpx;
+    box-shadow: 0 12rpx 30rpx rgba(15, 60, 110, 0.16);
+}
+
+.profile__info {
+    display: flex;
+    flex-direction: column;
+    gap: 6rpx;
+}
+
+.profile__name {
+    font-size: 40rpx;
+    font-weight: 700;
+}
+
+.stats {
+    display: flex;
+    gap: 20rpx;
+    margin-bottom: 28rpx;
+}
+
+.stats__item {
+    flex: 1;
+    background: #ffffff;
+    border: 1rpx solid rgba(27, 27, 25, 0.12);
+    border-radius: 18rpx;
+    padding: 24rpx;
+    display: flex;
+    flex-direction: column;
+    gap: 4rpx;
+}
+
+.stats__n {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: #0f6e63;
+}
+
+.stats__k {
+    font-size: 22rpx;
+    color: #8b8a82;
+}
+
+.menu {
+    background: #ffffff;
+    border: 1rpx solid rgba(27, 27, 25, 0.12);
+    border-radius: 18rpx;
+    overflow: hidden;
+}
+
+.menu__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 30rpx 26rpx;
+    font-size: 30rpx;
+    border-bottom: 1rpx solid rgba(27, 27, 25, 0.08);
+}
+
+.menu__item:last-child {
+    border-bottom: none;
+}
+
+.menu__arrow {
+    color: #b9b8ae;
+}
+
+.logout {
+    margin-top: 36rpx;
+}
+
+.ver {
+    display: block;
+    margin-top: 32rpx;
+    text-align: center;
+    font-size: 22rpx;
+    color: #b9b8ae;
+}
+
+.foot {
+    display: block;
+    margin-top: 12rpx;
+    text-align: center;
+    font-size: 22rpx;
+    color: #9a998f;
+}

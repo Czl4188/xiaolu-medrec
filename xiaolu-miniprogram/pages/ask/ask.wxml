@@ -1,0 +1,32 @@
+<view class="ask">
+  <view class="state" wx:if="{{!logged}}">
+    登录后才能问档案里的内容。
+    <button class="btn btn--primary state__btn" bindtap="goLogin">手机号登录</button>
+  </view>
+
+  <block wx:else>
+    <scroll-view class="thread" scroll-y scroll-into-view="{{intoView}}" scroll-with-animation>
+      <view class="msg {{item.role === 'user' ? 'msg--user' : 'msg--bot'}}"
+            wx:for="{{messages}}" wx:key="id" id="{{item.id}}">
+        <text class="msg__text">{{item.text}}</text>
+      </view>
+      <view class="msg msg--bot" wx:if="{{busy}}">
+        <text class="msg__text">小鹿正在翻档案…</text>
+      </view>
+      <view class="thread__pad"></view>
+    </scroll-view>
+
+    <view class="dock">
+      <scroll-view class="chips" scroll-x>
+        <text class="chip" wx:for="{{chips}}" wx:key="*this"
+              data-text="{{item}}" bindtap="tapChip">{{item}}</text>
+      </scroll-view>
+      <view class="composer">
+        <input class="composer__input" value="{{input}}" bindinput="onInput"
+               placeholder="问小鹿：上次看病是什么时候？" confirm-type="send" bindconfirm="send" />
+        <button class="composer__send" bindtap="send" disabled="{{busy}}">发送</button>
+      </view>
+      <text class="dock__note">只回答档案里有的内容，不构成诊疗建议。</text>
+    </view>
+  </block>
+</view>

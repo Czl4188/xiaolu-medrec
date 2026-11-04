@@ -1,0 +1,52 @@
+<view class="page">
+  <view class="hero" wx:if="{{!logged}}">
+    <image class="hero__deer" src="/assets/deer-512.png" mode="aspectFit" />
+    <text class="hero__title">小鹿医助</text>
+    <text class="hero__sub">把每次问诊，留成一页能翻回去的记录</text>
+    <button class="btn btn--primary hero__btn" bindtap="goLogin">手机号登录</button>
+    <text class="hero__note">登录后可以看到自己的档案；内容不构成诊疗建议。</text>
+  </view>
+
+  <block wx:else>
+    <view class="hello">
+      <image class="hello__deer" src="/assets/deer-512.png" mode="aspectFit" />
+      <view class="hello__txt">
+        <text class="hello__name">{{user.username || '你好'}}</text>
+        <text class="muted">已有 {{total}} 份就诊记录</text>
+      </view>
+    </view>
+
+    <view class="state" wx:if="{{loading}}">正在读取档案…</view>
+    <view class="state" wx:elif="{{error}}">{{error}}</view>
+
+    <view class="card last" wx:elif="{{last}}" bindtap="openLast">
+      <text class="last__tag">最近一次</text>
+      <text class="last__date">{{last.date}}</text>
+      <text class="last__hosp">{{last.hospital}}</text>
+      <text class="last__sum">{{last.summary}}</text>
+      <text class="last__meds">{{last.medsText}}</text>
+      <text class="last__more">查看详情 ›</text>
+    </view>
+
+    <view class="empty" wx:else>
+      还没有记录。网页版可以录音整理，这里可以先看看档案和提问。
+    </view>
+
+    <view class="grid">
+      <view class="grid__item" bindtap="goRecords">
+        <text class="grid__k">记录</text>
+        <text class="grid__h">按时间翻看病历</text>
+      </view>
+      <view class="grid__item" bindtap="goAsk">
+        <text class="grid__k">询问</text>
+        <text class="grid__h">只按你的档案回答</text>
+      </view>
+      <view class="grid__item" bindtap="goMine">
+        <text class="grid__k">我的</text>
+        <text class="grid__h">账号与资料</text>
+      </view>
+    </view>
+
+    <text class="foot">只复述档案里的内容，不做诊断、不改剂量。</text>
+  </block>
+</view>

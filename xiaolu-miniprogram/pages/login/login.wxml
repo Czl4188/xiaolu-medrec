@@ -1,0 +1,35 @@
+<view class="page login">
+  <image class="login__deer" src="/assets/deer-512.png" mode="aspectFit" />
+  <text class="login__title">小鹿医助</text>
+
+  <view class="tabs">
+    <view class="tabs__item {{mode === 'login' ? 'is-on' : ''}}" bindtap="switchToLogin">登录</view>
+    <view class="tabs__item {{mode === 'register' ? 'is-on' : ''}}" bindtap="switchToRegister">创建新账号</view>
+  </view>
+
+  <view class="field" wx:if="{{mode === 'register'}}">
+    <text class="field__k">用户名（可以重名，只用来称呼你）</text>
+    <input class="field__in" value="{{username}}" data-field="username" bindinput="onInput"
+           placeholder="怎么称呼你，2-24 个字" maxlength="24" />
+  </view>
+
+  <view class="field">
+    <text class="field__k">手机号</text>
+    <input class="field__in" value="{{phone}}" data-field="phone" bindinput="onInput"
+           type="number" placeholder="11 位手机号" maxlength="11" />
+  </view>
+
+  <view class="field">
+    <text class="field__k">密码</text>
+    <input class="field__in" value="{{password}}" data-field="password" bindinput="onInput"
+           password placeholder="至少 8 位" maxlength="64" />
+  </view>
+
+  <text class="form-error">{{error}}</text>
+
+  <button class="btn btn--primary" bindtap="submit" disabled="{{busy}}">
+    {{busy ? '处理中…' : (mode === 'register' ? '创建并登录' : '登录')}}
+  </button>
+
+  <text class="login__help" bindtap="goHelp">登录遇到问题？</text>
+</view>

@@ -1,0 +1,45 @@
+<view class="page">
+  <view class="state" wx:if="{{!logged}}">
+    还没有登录。
+    <button class="btn btn--primary state__btn" bindtap="goLogin">手机号登录</button>
+  </view>
+
+  <block wx:else>
+    <view class="profile">
+      <image class="profile__deer" src="/assets/deer-512.png" mode="aspectFit" />
+      <view class="profile__info">
+        <text class="profile__name">{{name || '小鹿用户'}}</text>
+        <text class="muted">{{phone}}{{phoneBound ? '' : ' · 未绑定手机号'}}</text>
+      </view>
+    </view>
+
+    <view class="stats">
+      <view class="stats__item">
+        <text class="stats__n">{{total}}</text>
+        <text class="stats__k">就诊记录</text>
+      </view>
+      <view class="stats__item">
+        <text class="stats__n">{{phoneBound ? '已绑定' : '未绑定'}}</text>
+        <text class="stats__k">登录手机号</text>
+      </view>
+    </view>
+
+    <view class="state" wx:if="{{error}}">{{error}}</view>
+
+    <view class="menu">
+      <view class="menu__item" bindtap="showAbout">
+        <text>关于小鹿医助</text>
+        <text class="menu__arrow">›</text>
+      </view>
+      <view class="menu__item" bindtap="showPrivacy">
+        <text>数据与隐私说明</text>
+        <text class="menu__arrow">›</text>
+      </view>
+    </view>
+
+    <button class="btn btn--ghost logout" bindtap="doLogout">退出登录</button>
+
+    <text class="ver">{{version}}</text>
+    <text class="foot">内容不构成诊疗建议，用药请遵医嘱。</text>
+  </block>
+</view>

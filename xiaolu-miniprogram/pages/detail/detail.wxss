@@ -1,0 +1,112 @@
+.state__btn {
+    margin-top: 32rpx;
+}
+
+.head {
+    display: flex;
+    flex-direction: column;
+    gap: 6rpx;
+    padding-bottom: 24rpx;
+    border-bottom: 1rpx solid rgba(27, 27, 25, 0.1);
+}
+
+.head__date {
+    font-size: 24rpx;
+    color: #8b8a82;
+}
+
+.head__hosp {
+    font-size: 40rpx;
+    font-weight: 700;
+}
+
+.head__sum {
+    font-size: 30rpx;
+    color: #3d3c37;
+}
+
+.head__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    margin-top: 8rpx;
+}
+
+.tag {
+    font-size: 22rpx;
+    color: #0f6e63;
+    background: rgba(15, 110, 99, 0.1);
+    border-radius: 999rpx;
+    padding: 4rpx 16rpx;
+}
+
+.block {
+    margin-top: 30rpx;
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+}
+
+.block__hd {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.block__k {
+    font-size: 24rpx;
+    color: #8b8a82;
+    letter-spacing: 1rpx;
+}
+
+.block__v {
+    font-size: 30rpx;
+}
+
+.block__li {
+    font-size: 28rpx;
+    color: #3d3c37;
+}
+
+.med {
+    background: #ffffff;
+    border: 1rpx solid rgba(27, 27, 25, 0.12);
+    border-radius: 14rpx;
+    padding: 20rpx 22rpx;
+    display: flex;
+    flex-direction: column;
+    gap: 4rpx;
+}
+
+.med__name {
+    font-size: 30rpx;
+    font-weight: 600;
+}
+
+.med__detail {
+    font-size: 24rpx;
+    color: #6b6a63;
+}
+
+.copy {
+    font-size: 24rpx;
+    color: #0f6e63;
+}
+
+.transcript {
+    font-size: 26rpx;
+    color: #4a4943;
+    line-height: 1.9;
+    background: #ffffff;
+    border: 1rpx solid rgba(27, 27, 25, 0.12);
+    border-radius: 14rpx;
+    padding: 22rpx;
+}
+
+.foot {
+    display: block;
+    margin-top: 40rpx;
+    text-align: center;
+    font-size: 22rpx;
+    color: #9a998f;
+}

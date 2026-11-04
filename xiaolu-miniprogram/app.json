@@ -1,0 +1,40 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/login/login",
+    "pages/records/records",
+    "pages/detail/detail",
+    "pages/ask/ask",
+    "pages/mine/mine"
+  ],
+  "window": {
+    "navigationBarTitleText": "小鹿医助",
+    "navigationBarBackgroundColor": "#faf9f5",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#faf9f5",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#8b8a82",
+    "selectedColor": "#0f6e63",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/records/records",
+        "text": "记录"
+      },
+      {
+        "pagePath": "pages/ask/ask",
+        "text": "询问"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

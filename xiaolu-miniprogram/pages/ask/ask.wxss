@@ -1,0 +1,122 @@
+.ask {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.state__btn {
+    margin-top: 32rpx;
+}
+
+.thread {
+    flex: 1;
+    padding: 24rpx 28rpx 0;
+    box-sizing: border-box;
+}
+
+.thread__pad {
+    height: 24rpx;
+}
+
+.msg {
+    display: flex;
+    margin-bottom: 20rpx;
+}
+
+.msg--bot {
+    justify-content: flex-start;
+}
+
+.msg--user {
+    justify-content: flex-end;
+}
+
+.msg__text {
+    max-width: 78%;
+    padding: 20rpx 24rpx;
+    border-radius: 18rpx;
+    font-size: 28rpx;
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+.msg--bot .msg__text {
+    background: #ffffff;
+    border: 1rpx solid rgba(27, 27, 25, 0.12);
+    border-top-left-radius: 6rpx;
+}
+
+.msg--user .msg__text {
+    background: #0f6e63;
+    color: #ffffff;
+    border-top-right-radius: 6rpx;
+}
+
+.dock {
+    border-top: 1rpx solid rgba(27, 27, 25, 0.1);
+    background: #faf9f5;
+    padding: 16rpx 24rpx 20rpx;
+}
+
+.chips {
+    white-space: nowrap;
+    margin-bottom: 14rpx;
+}
+
+.chip {
+    display: inline-block;
+    font-size: 24rpx;
+    color: #0f6e63;
+    background: #ffffff;
+    border: 1rpx solid rgba(15, 110, 99, 0.35);
+    border-radius: 999rpx;
+    padding: 10rpx 22rpx;
+    margin-right: 14rpx;
+}
+
+.composer {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+}
+
+.composer__input {
+    flex: 1;
+    height: 84rpx;
+    background: #ffffff;
+    border: 1rpx solid rgba(27, 27, 25, 0.18);
+    border-radius: 14rpx;
+    padding: 0 22rpx;
+    font-size: 28rpx;
+    box-sizing: border-box;
+}
+
+.composer__send {
+    width: 132rpx;
+    height: 84rpx;
+    line-height: 84rpx;
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #ffffff;
+    background: #0f6e63;
+    border-radius: 14rpx;
+    padding: 0;
+    margin: 0;
+}
+
+.composer__send::after {
+    border: none;
+}
+
+.composer__send[disabled] {
+    opacity: 0.55;
+}
+
+.dock__note {
+    display: block;
+    margin-top: 12rpx;
+    text-align: center;
+    font-size: 22rpx;
+    color: #9a998f;
+}

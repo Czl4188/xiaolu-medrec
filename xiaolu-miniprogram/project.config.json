@@ -1,0 +1,23 @@
+{
+  "description": "小鹿医助 · 微信小程序",
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": ".workbuddy"
+      }
+    ],
+    "include": []
+  },
+  "setting": {
+    "bundle": false,
+    "es6": true,
+    "minified": true,
+    "postcss": true,
+    "urlCheck": true
+  },
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "xiaolu-medical-assistant",
+  "miniprogramRoot": "./"
+}

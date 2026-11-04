@@ -1,0 +1,139 @@
+.hero {
+    padding: 72rpx 16rpx 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hero__deer {
+    width: 260rpx;
+    height: 260rpx;
+    border-radius: 56rpx;
+    box-shadow: 0 18rpx 44rpx rgba(15, 60, 110, 0.18);
+}
+
+.hero__title {
+    margin-top: 36rpx;
+    font-size: 56rpx;
+    font-weight: 700;
+    letter-spacing: 2rpx;
+}
+
+.hero__sub {
+    margin-top: 14rpx;
+    font-size: 28rpx;
+    color: #6b6a63;
+    text-align: center;
+}
+
+.hero__btn {
+    margin-top: 64rpx;
+    width: 100%;
+}
+
+.hero__note {
+    margin-top: 24rpx;
+    font-size: 22rpx;
+    color: #9a998f;
+    text-align: center;
+    line-height: 1.7;
+}
+
+.hello {
+    display: flex;
+    align-items: center;
+    gap: 20rpx;
+    margin-bottom: 28rpx;
+}
+
+.hello__deer {
+    width: 96rpx;
+    height: 96rpx;
+    border-radius: 26rpx;
+}
+
+.hello__txt {
+    display: flex;
+    flex-direction: column;
+}
+
+.hello__name {
+    font-size: 40rpx;
+    font-weight: 700;
+}
+
+.last {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    border-left: 6rpx solid #0f6e63;
+}
+
+.last__tag {
+    font-size: 22rpx;
+    color: #0f6e63;
+    letter-spacing: 2rpx;
+}
+
+.last__date {
+    font-size: 24rpx;
+    color: #8b8a82;
+}
+
+.last__hosp {
+    font-size: 32rpx;
+    font-weight: 600;
+}
+
+.last__sum {
+    font-size: 28rpx;
+    color: #3d3c37;
+}
+
+.last__meds {
+    font-size: 24rpx;
+    color: #6b6a63;
+}
+
+.last__more {
+    margin-top: 8rpx;
+    font-size: 24rpx;
+    color: #0f6e63;
+}
+
+.grid {
+    margin-top: 28rpx;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20rpx;
+}
+
+.grid__item {
+    flex: 1 1 30%;
+    min-width: 30%;
+    background: #ffffff;
+    border: 1rpx solid rgba(27, 27, 25, 0.12);
+    border-radius: 20rpx;
+    padding: 26rpx 20rpx;
+    display: flex;
+    flex-direction: column;
+    gap: 6rpx;
+}
+
+.grid__k {
+    font-size: 34rpx;
+    font-weight: 700;
+}
+
+.grid__h {
+    font-size: 22rpx;
+    color: #8b8a82;
+}
+
+.foot {
+    display: block;
+    margin-top: 40rpx;
+    font-size: 22rpx;
+    color: #9a998f;
+    text-align: center;
+}

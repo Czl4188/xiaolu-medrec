@@ -1,0 +1,52 @@
+<view class="page">
+  <view class="state" wx:if="{{loading}}">正在读取…</view>
+  <view class="state" wx:elif="{{error}}">
+    {{error}}
+    <button class="btn btn--ghost state__btn" bindtap="load">重试</button>
+  </view>
+
+  <block wx:elif="{{record}}">
+    <view class="head">
+      <text class="head__date">{{record.date}}</text>
+      <text class="head__hosp">{{record.hospital}}</text>
+      <text class="head__sum">{{record.summary}}</text>
+      <view class="head__tags" wx:if="{{record.conditions.length > 0}}">
+        <text class="tag" wx:for="{{record.conditions}}" wx:key="*this">{{item}}</text>
+      </view>
+    </view>
+
+    <view class="block">
+      <text class="block__k">用药</text>
+      <view class="med" wx:for="{{record.meds}}" wx:key="name">
+        <text class="med__name">{{item.name}}</text>
+        <text class="med__detail">{{item.detail}}</text>
+      </view>
+      <text class="muted" wx:if="{{record.meds.length === 0}}">这次没有记录用药</text>
+    </view>
+
+    <view class="block">
+      <text class="block__k">复诊</text>
+      <text class="block__v">{{record.followUp}}</text>
+    </view>
+
+    <view class="block" wx:if="{{record.allergy}}">
+      <text class="block__k">过敏</text>
+      <text class="block__v">{{record.allergy}}</text>
+    </view>
+
+    <view class="block" wx:if="{{record.notes.length > 0}}">
+      <text class="block__k">注意事项</text>
+      <text class="block__li" wx:for="{{record.notes}}" wx:key="*this">· {{item}}</text>
+    </view>
+
+    <view class="block" wx:if="{{record.transcript}}">
+      <view class="block__hd">
+        <text class="block__k">原始转写</text>
+        <text class="copy" bindtap="copyTranscript">复制</text>
+      </view>
+      <text class="transcript">{{record.transcript}}</text>
+    </view>
+
+    <text class="foot">内容来自你的记录，不构成诊疗建议。</text>
+  </block>
+</view>

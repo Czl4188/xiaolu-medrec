@@ -23,6 +23,16 @@
 
 ---
 
+## 微信小程序
+
+`xiaolu-miniprogram/` 是原生微信小程序，复用同一套后端：手机号登录、按时间翻档案、只按档案回答。
+用同一手机号密码登录，看到的就是网页版里的档案。
+
+自己跑起来 / 上线前要做什么（配置 request 合法域名、生成小程序码、名称审核），见
+[xiaolu-miniprogram/README.md](xiaolu-miniprogram/README.md)。
+
+---
+
 ## 功能
 
 - **录音转写**：浏览器语音识别边说边转写，停下后再用千问转写校对一遍；也可以直接粘贴文字
@@ -63,6 +73,7 @@
 │   └── README.md
 ├── assets/                   # 入口二维码（卡片 + 纯码）
 ├── scripts/make_qr.py        # 重新生成二维码
+├── xiaolu-miniprogram/       # 微信小程序（原生，复用同一后端）
 ├── xiaoxiao-medrec/          # 可安装的 WorkBuddy Skill
 ├── ARCHITECTURE.md           # 架构：模块、数据流、接口、关键取舍
 ├── CONTRIBUTING.md           # 协作规则：分支、提交、测试、安全红线
