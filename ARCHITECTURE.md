@@ -193,6 +193,9 @@ flowchart TD
 - 需要服务端配置 `ADMIN_TOKEN` 且请求头带 `X-Admin-Token`，否则返回 404（等于接口不存在）；
 - `GET` 只预演（谁绑定、谁删除、哪些号码冲突），`POST` 必须带 `confirm=DELETE` 才执行；
 - 删除前把账号、资料、记录导出成 JSON（密文字段原样保留），落盘到 `data/legacy-backup-*.json` 并随响应返回；
+- 配套：`GET /api/admin/accounts` 列账号（手机号打码）、`POST /api/admin/accounts/purge`
+  按 id 白名单清理、`POST /api/admin/accounts/restore` 从备份恢复、
+  `POST /api/admin/accounts/import-records` 把备份里的档案并入现有账号（按 `client_id` 去重）；
 - **用完必须清空 `ADMIN_TOKEN` 并重新发布**，接口随之消失。
 
 ### 账号与登录

@@ -13,7 +13,15 @@
 - 删除前把账号、资料、记录打包成 JSON 备份落盘并随响应返回，备份保留密文字段，
   同一个 `secret.key` 下可以原样恢复。
 
-跑完建议把 `ADMIN_TOKEN` 清空再发布一次，这个接口就消失了。
+另外提供两个配套动作，同样受 ADMIN_TOKEN 保护：
+
+- `GET  /api/admin/accounts`        当前账号清单（手机号打码、记录数），用来定「留谁删谁」；
+- `POST /api/admin/accounts/purge`  按 id 白名单清理，先备份再删；
+- `POST /api/admin/accounts/restore` 从备份 JSON 恢复账号（密码需重设，原散列无法还原）；
+- `POST /api/admin/accounts/import-records` 把备份账号里的档案并入一个现有账号
+  （适合「新号已经能登录、老号只有档案」的情况，不必让用户换密码）。
+
+跑完建议把 `ADMIN_TOKEN` 清空再发布一次，这些接口就消失了。
 """
 
 import hmac
@@ -206,3 +214,163 @@ def apply(body: dict, db: Session = Depends(get_db)) -> dict:
         "backup_file": str(path),
         "backup": backup,
     }
+
+
+# ————————————————— 账号清单 / 清理 / 恢复 —————————————————
+def _mask(phone: str) -> str:
+    return (phone[:3] + "****" + phone[-4:]) if len(phone) == 11 else ""
+
+
+@router.get("/accounts", dependencies=[Depends(_require_admin)])
+def list_accounts(db: Session = Depends(get_db)) -> dict:
+    rows = []
+    for user in db.scalars(select(User).order_by(User.created_at)):
+        records = len(list(db.scalars(select(Record.id).where(Record.user_id == user.id))))
+        rows.append({
+            "id": user.id,
+            "username": user.username,
+            "phone": _mask(decrypt(user.phone_enc)),
+            "phone_bound": bool(user.phone_hash),
+            "records": records,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        })
+    return {"total": len(rows), "accounts": rows}
+
+
+@router.post("/accounts/purge", dependencies=[Depends(_require_admin)])
+def purge_accounts(body: dict, db: Session = Depends(get_db)) -> dict:
+    """按 id 白名单清理：不在 keep_ids 里的账号一律注销。"""
+    if str(body.get("confirm") or "") != "DELETE":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "需要 confirm=DELETE 才会执行")
+
+    keep = {str(x) for x in (body.get("keep_ids") or [])}
+    if not keep:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "keep_ids 不能为空，避免误删全部")
+
+    users = list(db.scalars(select(User)))
+    victims = [u for u in users if u.id not in keep]
+
+    backup = _backup(db, [{"id": u.id, "username": u.username, "records": 0} for u in victims])
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    path = BACKUP_DIR / f"purge-backup-{stamp}.json"
+    path.write_text(json.dumps(backup, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    deleted = []
+    for user in victims:
+        name, count = user.username, len(list(db.scalars(
+            select(Record.id).where(Record.user_id == user.id))))
+        repo.delete_user_account(db, user.id)
+        deleted.append({"username": name, "records": count})
+
+    return {"ok": True, "deleted": deleted, "backup_file": str(path), "backup": backup}
+
+
+@router.post("/accounts/restore", dependencies=[Depends(_require_admin)])
+def restore_account(body: dict, db: Session = Depends(get_db)) -> dict:
+    """从备份里的一条账号恢复到库里。
+
+    原来的 password_hash 没有备份（也不该备份），所以必须指定新密码；
+    手机号若仍被别人占用会直接报错，需要先清理占用方。
+    """
+    account = body.get("account") or {}
+    password = str(body.get("password") or "")
+    if not account.get("user") or len(password) < 8:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "缺少账号数据，或密码少于 8 位")
+
+    from app.core.crypto import encrypt
+    from app.core.security import hash_password
+    from app.db.models import Profile as ProfileModel, Record as RecordModel
+
+    info = account["user"]
+    if db.get(User, info["id"]) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "该账号已存在，未重复恢复")
+
+    prof = account.get("profile") or {}
+    phone = normalize_phone(decrypt(prof.get("phone_enc") or ""))
+    if phone and repo.get_user_by_phone(db, phone):
+        raise HTTPException(status.HTTP_409_CONFLICT, "该手机号已被其它账号占用，请先清理")
+
+    created = datetime.fromisoformat(info["created_at"]) if info.get("created_at") else datetime.now(UTC)
+    user = User(
+        id=info["id"],
+        username=info["username"],
+        display_name=info.get("display_name") or info["username"],
+        password_hash=hash_password(password),
+        phone_hash=phone_digest(phone) or None,
+        phone_enc=encrypt(phone),
+        created_at=created,
+    )
+    db.add(user)
+    db.add(ProfileModel(
+        user_id=user.id,
+        name=prof.get("name") or info["username"],
+        age=prof.get("age") or "",
+        gender=prof.get("gender") or "",
+        hospital=prof.get("hospital") or "",
+        phone_enc=prof.get("phone_enc") or "",
+        idcard_enc=prof.get("idcard_enc") or "",
+    ))
+    for rec in account.get("records") or []:
+        visit = rec.get("visit_at")
+        db.add(RecordModel(
+            user_id=user.id,
+            client_id=rec.get("client_id") or "",
+            visit_at=datetime.fromisoformat(visit) if visit else datetime.now(UTC),
+            hospital=rec.get("hospital") or "",
+            summary=rec.get("summary") or "",
+            transcript=rec.get("transcript") or "",
+            meds=rec.get("meds") or [],
+            follow_up=rec.get("follow_up") or "",
+            notes=rec.get("notes") or [],
+            conditions=rec.get("conditions") or [],
+            discontinued=rec.get("discontinued") or [],
+            allergy=rec.get("allergy") or "",
+            allergy_denied=bool(rec.get("allergy_denied")),
+            mode=rec.get("mode") or "manual",
+        ))
+    db.commit()
+    return {"ok": True, "username": user.username, "phone": _mask(phone),
+            "records": len(account.get("records") or []), "password_reset": True}
+
+
+@router.post("/accounts/import-records", dependencies=[Depends(_require_admin)])
+def import_records(body: dict, db: Session = Depends(get_db)) -> dict:
+    """把备份里某个账号的就诊记录并入现有账号，按 client_id 去重。"""
+    from app.db.models import Record as RecordModel
+
+    target_id = str(body.get("target_id") or "")
+    account = body.get("account") or {}
+    user = db.get(User, target_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "目标账号不存在")
+
+    existing = {c for c in db.scalars(
+        select(RecordModel.client_id).where(RecordModel.user_id == target_id))}
+    added, skipped = 0, 0
+    for rec in account.get("records") or []:
+        cid = rec.get("client_id") or ""
+        if cid and cid in existing:
+            skipped += 1
+            continue
+        visit = rec.get("visit_at")
+        db.add(RecordModel(
+            user_id=target_id,
+            client_id=cid,
+            visit_at=datetime.fromisoformat(visit) if visit else datetime.now(UTC),
+            hospital=rec.get("hospital") or "",
+            summary=rec.get("summary") or "",
+            transcript=rec.get("transcript") or "",
+            meds=rec.get("meds") or [],
+            follow_up=rec.get("follow_up") or "",
+            notes=rec.get("notes") or [],
+            conditions=rec.get("conditions") or [],
+            discontinued=rec.get("discontinued") or [],
+            allergy=rec.get("allergy") or "",
+            allergy_denied=bool(rec.get("allergy_denied")),
+            mode=rec.get("mode") or "manual",
+        ))
+        existing.add(cid)
+        added += 1
+    db.commit()
+    return {"ok": True, "username": user.username, "added": added, "skipped": skipped}

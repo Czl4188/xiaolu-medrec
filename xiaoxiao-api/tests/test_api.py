@@ -1,6 +1,7 @@
 """接口测试：覆盖鉴权、跨用户隔离、抽取、作答边界、幂等。"""
 
 import uuid
+from datetime import datetime
 
 TRANSCRIPT = (
     "今天下午去了市第一人民医院消化内科。医生说还是慢性胃炎伴糜烂，比上次好一些。"
@@ -780,5 +781,118 @@ def test_legacy_migration_binds_phone_and_deletes_rest(client):
         assert login.status_code == 200, login.text
         headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
         assert len(client.get("/api/records", headers=headers).json()) == 1
+    finally:
+        settings.admin_token = saved
+
+
+# ————————————————— 账号清单 / 白名单清理 / 备份恢复 —————————————————
+def test_purge_and_restore_roundtrip(client):
+    from app.core.config import settings
+    from app.db import repo
+    from app.db.models import Record, User
+    from app.db.session import SessionLocal
+
+    saved = settings.admin_token
+    settings.admin_token = "test-admin"
+    admin = {"X-Admin-Token": "test-admin"}
+    stamp = uuid.uuid4().hex[:6]
+    phone_keep = "135" + f"{uuid.uuid4().int % 10**8:08d}"
+    phone_drop = "136" + f"{uuid.uuid4().int % 10**8:08d}"
+
+    try:
+        with SessionLocal() as db:
+            keep = repo.create_user(db, "保留号" + stamp, "x", phone_keep)
+            drop = repo.create_user(db, "清理号" + stamp, "x", phone_drop)
+            keep_id, drop_id = keep.id, drop.id
+            repo.create_record(db, drop_id, {
+                "client_id": "purge_" + stamp,
+                "visit_at": datetime.fromisoformat("2026-10-02T09:00:00+08:00"),
+                "hospital": "市第二人民医院",
+                "summary": "支气管炎",
+                "transcript": "开了阿莫西林",
+                "meds": [],
+                "follow_up": "",
+                "notes": [],
+                "conditions": [],
+                "discontinued": [],
+                "allergy": "",
+                "allergy_denied": False,
+                "mode": "manual",
+            })
+
+        # 未确认不执行；白名单为空也不执行
+        assert client.post("/api/admin/accounts/purge", headers=admin,
+                           json={"keep_ids": [keep_id]}).status_code == 400
+        assert client.post("/api/admin/accounts/purge", headers=admin,
+                           json={"keep_ids": [], "confirm": "DELETE"}).status_code == 400
+
+        res = client.post("/api/admin/accounts/purge", headers=admin,
+                          json={"keep_ids": [keep_id], "confirm": "DELETE"}).json()
+        assert res["ok"] is True
+        assert any(x["username"] == "清理号" + stamp for x in res["deleted"])
+
+        with SessionLocal() as db:
+            assert db.get(User, keep_id) is not None
+            assert db.get(User, drop_id) is None
+
+        # 从备份恢复：手机号与两条数据都要回来，密码用新的
+        entry = next(a for a in res["backup"]["accounts"]
+                     if a["user"]["username"] == "清理号" + stamp)
+        r = client.post("/api/admin/accounts/restore", headers=admin,
+                        json={"account": entry, "password": "newpass12345"})
+        assert r.status_code == 200, r.text
+        assert r.json()["records"] == 1
+
+        login = client.post("/api/auth/login",
+                            json={"phone": phone_drop, "password": "newpass12345"})
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        assert len(client.get("/api/records", headers=headers).json()) == 1
+
+        # 重复恢复要拒绝
+        again = client.post("/api/admin/accounts/restore", headers=admin,
+                            json={"account": entry, "password": "newpass12345"})
+        assert again.status_code == 409
+    finally:
+        settings.admin_token = saved
+
+
+def test_import_records_into_existing_account(client):
+    from app.core.config import settings
+    from app.db import repo
+    from app.db.models import User
+    from app.db.session import SessionLocal
+
+    saved = settings.admin_token
+    settings.admin_token = "test-admin"
+    admin = {"X-Admin-Token": "test-admin"}
+    stamp = uuid.uuid4().hex[:6]
+    try:
+        with SessionLocal() as db:
+            target = repo.create_user(db, "并入目标" + stamp, "x", "137" + f"{uuid.uuid4().int % 10**8:08d}")
+            target_id = target.id
+
+        entry = {
+            "user": {"id": "old-" + stamp, "username": "并入目标" + stamp, "display_name": "", "created_at": None},
+            "profile": {},
+            "records": [{
+                "client_id": "imp_" + stamp, "visit_at": "2026-10-03T09:00:00+08:00",
+                "hospital": "市第一人民医院", "summary": "胃炎", "transcript": "开奥美拉唑",
+                "meds": [], "follow_up": "", "notes": [], "conditions": [],
+                "discontinued": [], "allergy": "", "allergy_denied": False, "mode": "manual",
+            }],
+        }
+        r = client.post("/api/admin/accounts/import-records", headers=admin,
+                        json={"target_id": target_id, "account": entry})
+        assert r.status_code == 200, r.text
+        assert r.json()["added"] == 1
+
+        # 再导一次：按 client_id 去重
+        again = client.post("/api/admin/accounts/import-records", headers=admin,
+                            json={"target_id": target_id, "account": entry}).json()
+        assert again["added"] == 0 and again["skipped"] == 1
+
+        with SessionLocal() as db:
+            assert db.get(User, target_id) is not None
     finally:
         settings.admin_token = saved
