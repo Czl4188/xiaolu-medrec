@@ -675,3 +675,110 @@ def test_bind_phone_rejects_number_taken_by_another_account(client, fresh_header
     r = client.post("/api/me/phone", headers=fresh_headers,
                     json={"phone": phone, "password": "pass12345"})
     assert r.status_code == 409
+
+
+
+# ————————————————— 老账号迁移：填过手机号的绑定，没填的注销 —————————————————
+def _legacy_user(db, username, phone_in_profile=""):
+    from app.core.security import hash_password
+    from app.db import repo
+
+    user = repo.create_user(db, username, hash_password("pass12345"))
+    if phone_in_profile:
+        repo.upsert_profile(db, user.id, phone=phone_in_profile)
+    return user
+
+
+def test_admin_legacy_requires_token(client):
+    from app.core.config import settings
+
+    saved = settings.admin_token
+    try:
+        settings.admin_token = ""          # 未启用 = 接口不存在
+        assert client.get("/api/admin/legacy-accounts").status_code == 404
+        settings.admin_token = "test-admin"
+        assert client.get("/api/admin/legacy-accounts").status_code == 403
+        assert client.get("/api/admin/legacy-accounts",
+                          headers={"X-Admin-Token": "wrong"}).status_code == 403
+    finally:
+        settings.admin_token = saved
+
+
+def test_legacy_migration_binds_phone_and_deletes_rest(client):
+    """填过手机号的能直接登录；没填的（含号码冲突）按产品要求注销。"""
+    from datetime import datetime
+
+    from sqlalchemy import select
+
+    from app.core.config import settings
+    from app.db import repo
+    from app.db.models import Record, User
+    from app.db.session import SessionLocal
+
+    saved = settings.admin_token
+    settings.admin_token = "test-admin"
+    admin = {"X-Admin-Token": "test-admin"}
+    stamp = uuid.uuid4().hex[:6]
+    phone_ok = "133" + f"{uuid.uuid4().int % 10**8:08d}"
+    phone_taken = "134" + f"{uuid.uuid4().int % 10**8:08d}"
+
+    try:
+        with SessionLocal() as db:
+            # 1) 资料里填过手机号 → 应绑定，记录要保留
+            u_ok = _legacy_user(db, "老号有手机" + stamp, phone_ok)
+            repo.create_record(db, u_ok.id, {
+                "client_id": "legacy_keep_" + stamp,
+                "visit_at": datetime.fromisoformat("2026-10-01T09:00:00+08:00"),
+                "hospital": "市第一人民医院",
+                "summary": "慢性胃炎",
+                "transcript": "胃炎，开奥美拉唑",
+                "meds": [],
+                "follow_up": "",
+                "notes": [],
+                "conditions": [],
+                "discontinued": [],
+                "allergy": "",
+                "allergy_denied": False,
+                "mode": "manual",
+            })
+            # 2) 完全没填手机号 → 应注销
+            u_none = _legacy_user(db, "老号没手机" + stamp)
+            # 3) 手机号被别人占了 → 无法登录，也注销
+            u_conflict = _legacy_user(db, "老号撞号" + stamp, phone_taken)
+            # 4) 号码主人：正常手机号账号，不该被碰
+            owner = repo.create_user(db, "号码主人" + stamp, "x", phone_taken)
+            ok_id, none_id, conflict_id, owner_id = u_ok.id, u_none.id, u_conflict.id, owner.id
+
+        preview = client.get("/api/admin/legacy-accounts", headers=admin).json()
+        bind_names = [x["username"] for x in preview["to_bind"]]
+        del_names = [x["username"] for x in preview["to_delete"]]
+        assert "老号有手机" + stamp in bind_names
+        assert "老号没手机" + stamp in del_names
+        assert "老号撞号" + stamp in del_names
+        assert "号码主人" + stamp not in bind_names + del_names
+        assert any(x["username"] == "老号撞号" + stamp for x in preview["conflicts"])
+
+        # 没有 confirm 不许执行
+        assert client.post("/api/admin/legacy-accounts", headers=admin,
+                           json={"apply": True}).status_code == 400
+
+        res = client.post("/api/admin/legacy-accounts", headers=admin,
+                          json={"confirm": "DELETE"}).json()
+        assert res["ok"] is True and res["backup"]["accounts"]
+
+        with SessionLocal() as db:
+            assert db.get(User, none_id) is None
+            assert db.get(User, conflict_id) is None
+            assert db.get(User, owner_id) is not None
+            migrated = db.get(User, ok_id)
+            assert migrated is not None and migrated.phone_hash
+            kept = list(db.scalars(select(Record).where(Record.user_id == ok_id)))
+            assert len(kept) == 1, "绑定手机号不应影响档案"
+
+        # 绑定后能直接用手机号登录，原密码不变，记录还在
+        login = client.post("/api/auth/login", json={"phone": phone_ok, "password": "pass12345"})
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        assert len(client.get("/api/records", headers=headers).json()) == 1
+    finally:
+        settings.admin_token = saved

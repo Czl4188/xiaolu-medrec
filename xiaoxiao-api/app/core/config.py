@@ -45,6 +45,8 @@ class Settings(BaseSettings):
 
     # —— 安全 ——
     secret_key: str = "dev-only-insecure-change-me"
+    # 一次性数据迁移用的管理令牌；留空则 /api/admin/* 直接 404
+    admin_token: str = ""
     access_token_ttl_seconds: int = 60 * 60 * 24 * 7
     cors_origins: str = "http://localhost:8000,http://127.0.0.1:8000"
     max_request_mb: int = 2              # 普通 JSON 请求体上限

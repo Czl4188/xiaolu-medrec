@@ -21,6 +21,8 @@ config.env
 data/
 *.db
 *.sqlite3
+# 一次性迁移导出的账号备份，含病历与密文，绝不入库
+backups/
 
 # 示例配置需要保留
 !.env.example

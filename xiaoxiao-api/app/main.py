@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (
+    routes_admin,
     routes_ai,
     routes_auth,
     routes_chat,
@@ -161,7 +162,7 @@ def create_app() -> FastAPI:
         )
         return response
 
-    for module in (routes_health, routes_auth, routes_me, routes_records, routes_chat, routes_ai, routes_ops):
+    for module in (routes_health, routes_auth, routes_me, routes_records, routes_chat, routes_ai, routes_admin, routes_ops):
         app.include_router(module.router)
 
     @app.exception_handler(Exception)
