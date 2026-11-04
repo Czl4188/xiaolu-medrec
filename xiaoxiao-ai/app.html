@@ -1194,7 +1194,7 @@ body[data-view="ask"] #app{height:100dvh}
       <span id="gateFootA">手机号 + 密码登录</span>
       <span id="gateFootB">登录后显示存储位置</span>
     </div>
-    <p class="gate__ver" id="gateVer">v4 · 2026-11-04 · 手机号登录</p>
+    <p class="gate__ver" id="gateVer">v5 · 2026-11-04 · 手机号登录</p>
   </div>
 </div>
 
@@ -2635,7 +2635,10 @@ body[data-view="ask"] #app{height:100dvh}
       if (API.on) {
         cloudLogin({
           isNew: isNew, username: regName, phone: phone,
-          legacy: legacyName, password: p
+          /* 只有真的切到「用户名登录」才走老通道；隐藏栏里被密码管理器自动填了
+             旧用户名时，不能把手机号登录顶掉 */
+          legacy: gateMode === 'user' ? legacyName : '',
+          password: p
         }, err);
         return;
       }
