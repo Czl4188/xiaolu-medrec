@@ -19,7 +19,10 @@
 - `POST /api/admin/accounts/purge`  按 id 白名单清理，先备份再删；
 - `POST /api/admin/accounts/restore` 从备份 JSON 恢复账号（密码需重设，原散列无法还原）；
 - `POST /api/admin/accounts/import-records` 把备份账号里的档案并入一个现有账号
-  （适合「新号已经能登录、老号只有档案」的情况，不必让用户换密码）。
+  （适合「新号已经能登录、老号只有档案」的情况，不必让用户换密码）；
+- `POST /api/admin/accounts/merge` 两个现有账号合并：档案搬过去、资料空字段补齐，
+  可选删除来源账号（先备份）；
+- `POST /api/admin/accounts/credentials` 改手机号与密码（合并后把登录方式对齐用）。
 
 跑完建议把 `ADMIN_TOKEN` 清空再发布一次，这些接口就消失了。
 """
@@ -31,13 +34,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.crypto import decrypt, normalize_phone, phone_digest
 from app.db import repo
 from app.db.models import Profile, Record, User
+from app.db.models import Session as AuthSession
 from app.db.session import get_db
 
 logger = logging.getLogger("app.admin")
@@ -374,3 +378,111 @@ def import_records(body: dict, db: Session = Depends(get_db)) -> dict:
         added += 1
     db.commit()
     return {"ok": True, "username": user.username, "added": added, "skipped": skipped}
+
+
+@router.post("/accounts/merge", dependencies=[Depends(_require_admin)])
+def merge_accounts(body: dict, db: Session = Depends(get_db)) -> dict:
+    """把 from_id 的内容并入 to_id。
+
+    - 就诊记录按 client_id 去重后搬过去（来源账号的记录会被删除，不是复制）；
+    - 资料只补 to 的空字段（姓名以 to 为准，避免把新号名字改掉）；
+    - delete_source=true 时删掉来源账号；删除前先把来源完整备份。
+    """
+    from app.db.models import Profile as ProfileModel, Record as RecordModel
+
+    src_id = str(body.get("from_id") or "")
+    dst_id = str(body.get("to_id") or "")
+    if not src_id or not dst_id or src_id == dst_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "from_id / to_id 不合法")
+    src, dst = db.get(User, src_id), db.get(User, dst_id)
+    if src is None or dst is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "来源或目标账号不存在")
+
+    backup = _backup(db, [{"id": src.id, "username": src.username, "records": 0}])
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    path = BACKUP_DIR / f"merge-{src.username}-{stamp}.json"
+    path.write_text(json.dumps(backup, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # 记录：搬过去（先去重，再删来源）
+    dst_cids = {c for c in db.scalars(
+        select(RecordModel.client_id).where(RecordModel.user_id == dst_id))}
+    moved, skipped = 0, 0
+    for rec in list(db.scalars(select(RecordModel).where(RecordModel.user_id == src_id))):
+        if rec.client_id and rec.client_id in dst_cids:
+            skipped += 1
+            db.delete(rec)
+            continue
+        rec.user_id = dst_id
+        dst_cids.add(rec.client_id)
+        moved += 1
+
+    # 资料：只补空字段
+    sp, dp = db.get(ProfileModel, src_id), db.get(ProfileModel, dst_id)
+    filled = []
+    if sp is not None:
+        if dp is None:
+            dp = ProfileModel(user_id=dst_id, name=sp.name)
+            db.add(dp)
+        for field in ("age", "gender", "hospital"):
+            if not getattr(dp, field) and getattr(sp, field):
+                setattr(dp, field, getattr(sp, field))
+                filled.append(field)
+        if not dp.idcard_enc and sp.idcard_enc:
+            dp.idcard_enc = sp.idcard_enc
+            filled.append("idcard")
+        # 手机号以目标账号为准，不搬（它是登录身份）
+
+    db.commit()
+
+    deleted = False
+    if bool(body.get("delete_source")):
+        repo.delete_user_account(db, src_id)
+        deleted = True
+
+    return {
+        "ok": True,
+        "from": src.username,
+        "to": dst.username,
+        "moved_records": moved,
+        "skipped_records": skipped,
+        "filled_profile": filled,
+        "source_deleted": deleted,
+        "backup_file": str(path),
+        "backup": backup,
+    }
+
+
+@router.post("/accounts/credentials", dependencies=[Depends(_require_admin)])
+def set_credentials(body: dict, db: Session = Depends(get_db)) -> dict:
+    """合并后把目标账号的登录方式改回用户熟悉的手机号 / 密码。
+
+    只给运维用：手机号查重，密码走正常散列。
+    """
+    from app.core.crypto import encrypt
+    from app.core.security import hash_password
+
+    user_id = str(body.get("user_id") or "")
+    phone = normalize_phone(str(body.get("phone") or ""))
+    password = str(body.get("password") or "")
+    if not phone or len(password) < 8:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "手机号或密码不合法")
+
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "账号不存在")
+
+    holder = repo.get_user_by_phone(db, phone)
+    if holder is not None and holder.id != user.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "该手机号已被其它账号占用")
+
+    user.phone_hash = phone_digest(phone)
+    user.phone_enc = encrypt(phone)
+    user.password_hash = hash_password(password)
+    profile = db.get(Profile, user.id)
+    if profile is not None:
+        profile.phone_enc = encrypt(phone)
+    # 改密后让旧会话失效，避免旧设备继续挂着
+    db.execute(delete(AuthSession).where(AuthSession.user_id == user.id))
+    db.commit()
+    return {"ok": True, "username": user.username, "phone": _mask(phone)}

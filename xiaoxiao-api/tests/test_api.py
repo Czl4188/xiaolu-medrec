@@ -905,3 +905,86 @@ def test_login_accepts_phone_typed_into_username_field(client):
     r = client.post("/api/auth/login", json={"username": phone, "password": "pass12345"})
     assert r.status_code == 200, r.text
     assert r.json()["user"]["phone"] == phone
+
+
+def test_merge_accounts_moves_records_and_fills_profile(client):
+    from app.core.config import settings
+    from app.db import repo
+    from app.db.models import Profile, Record, User
+    from app.db.session import SessionLocal
+    from sqlalchemy import select
+
+    saved = settings.admin_token
+    settings.admin_token = "test-admin"
+    admin = {"X-Admin-Token": "test-admin"}
+    stamp = uuid.uuid4().hex[:6]
+    try:
+        with SessionLocal() as db:
+            src = repo.create_user(db, "老号合并" + stamp, "x", "138" + f"{uuid.uuid4().int % 10**8:08d}")
+            dst = repo.create_user(db, "新号合并" + stamp, "x", "139" + f"{uuid.uuid4().int % 10**8:08d}")
+            src_id, dst_id = src.id, dst.id
+            repo.upsert_profile(db, src_id, hospital="市第一人民医院", age="33")
+            for i in (1, 2):
+                repo.create_record(db, src_id, {
+                    "client_id": f"merge_{stamp}_{i}",
+                    "visit_at": datetime.fromisoformat(f"2026-10-0{i}T09:00:00+08:00"),
+                    "hospital": "市第一人民医院", "summary": f"诊断{i}",
+                    "transcript": "x", "meds": [], "follow_up": "", "notes": [],
+                    "conditions": [], "discontinued": [], "allergy": "",
+                    "allergy_denied": False, "mode": "manual",
+                })
+
+        r = client.post("/api/admin/accounts/merge", headers=admin,
+                        json={"from_id": src_id, "to_id": dst_id, "delete_source": True})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["moved_records"] == 2
+        assert body["source_deleted"] is True
+        assert "hospital" in body["filled_profile"]
+
+        with SessionLocal() as db:
+            assert db.get(User, src_id) is None
+            recs = list(db.scalars(select(Record).where(Record.user_id == dst_id)))
+            assert len(recs) == 2
+            prof = db.get(Profile, dst_id)
+            assert prof.hospital == "市第一人民医院" and prof.age == "33"
+            # 目标账号姓名不被改写
+            assert prof.name == "新号合并" + stamp
+    finally:
+        settings.admin_token = saved
+
+
+def test_admin_can_reset_credentials(client):
+    from app.core.config import settings
+    from app.db import repo
+    from app.db.session import SessionLocal
+
+    saved = settings.admin_token
+    settings.admin_token = "test-admin"
+    admin = {"X-Admin-Token": "test-admin"}
+    old_phone = "138" + f"{uuid.uuid4().int % 10**8:08d}"
+    new_phone = "139" + f"{uuid.uuid4().int % 10**8:08d}"
+    try:
+        with SessionLocal() as db:
+            user = repo.create_user(db, "改凭据" + uuid.uuid4().hex[:6], "x", old_phone)
+            uid = user.id
+
+        r = client.post("/api/admin/accounts/credentials", headers=admin,
+                        json={"user_id": uid, "phone": new_phone, "password": "20080330"})
+        assert r.status_code == 200, r.text
+
+        assert client.post("/api/auth/login",
+                           json={"phone": old_phone, "password": "20080330"}).status_code == 401
+        ok = client.post("/api/auth/login",
+                         json={"phone": new_phone, "password": "20080330"})
+        assert ok.status_code == 200, ok.text
+
+        # 手机号被别人占用要拒绝
+        other_phone = "137" + f"{uuid.uuid4().int % 10**8:08d}"
+        with SessionLocal() as db:
+            repo.create_user(db, "占位" + uuid.uuid4().hex[:6], "x", other_phone)
+        bad = client.post("/api/admin/accounts/credentials", headers=admin,
+                          json={"user_id": uid, "phone": other_phone, "password": "20080330"})
+        assert bad.status_code == 409
+    finally:
+        settings.admin_token = saved

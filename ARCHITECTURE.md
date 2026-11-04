@@ -195,7 +195,9 @@ flowchart TD
 - 删除前把账号、资料、记录导出成 JSON（密文字段原样保留），落盘到 `data/legacy-backup-*.json` 并随响应返回；
 - 配套：`GET /api/admin/accounts` 列账号（手机号打码）、`POST /api/admin/accounts/purge`
   按 id 白名单清理、`POST /api/admin/accounts/restore` 从备份恢复、
-  `POST /api/admin/accounts/import-records` 把备份里的档案并入现有账号（按 `client_id` 去重）；
+  `POST /api/admin/accounts/import-records` 把备份里的档案并入现有账号（按 `client_id` 去重）、
+  `POST /api/admin/accounts/merge` 两个现有账号合并（记录搬到目标、资料只补空字段、可删来源）、
+  `POST /api/admin/accounts/credentials` 合并后把手机号与密码对齐；
 - **用完必须清空 `ADMIN_TOKEN` 并重新发布**，接口随之消失。
 
 ### 账号与登录
