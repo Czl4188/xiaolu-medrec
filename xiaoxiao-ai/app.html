@@ -656,6 +656,7 @@ body[data-view="ask"] #app{height:100dvh}
 .file-meta{margin:0 0 8px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.03em;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
 
 .transcript{display:grid;gap:6px;max-height:214px;overflow-y:auto;padding-right:2px;margin-bottom:4px}
+#trMeta:empty{display:none}
 .tr-line{display:grid;grid-template-columns:50px minmax(0,1fr);gap:8px;margin:0;font-size:12.5px;line-height:1.8;max-width:none}
 .tr-ts{font-family:var(--font-mono);font-size:9px;color:var(--muted);padding-top:4px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
 .tr-tx{color:var(--ink-2);overflow-wrap:anywhere}
@@ -1531,10 +1532,8 @@ body[data-view="ask"] #app{height:100dvh}
           </span>
         </button>
         <div class="panel__body">
-          <p class="file-meta" id="trMeta">未开始 · 浏览器端转写</p>
-          <div class="transcript" id="transcript">
-            <p class="empty">点上面的「开始录音」，你说的话会一段段落在这里。录音会发到服务端转成文字，转写只存进你的档案。</p>
-          </div>
+          <p class="file-meta" id="trMeta"></p>
+          <div class="transcript" id="transcript"></div>
 
           <div class="manual">
             <label class="sr-only" for="manualText">手动输入问诊内容</label>
@@ -4572,7 +4571,7 @@ body[data-view="ask"] #app{height:100dvh}
     var box = $('#transcript');
     if (!box) return;
     if (!state.lines.length && !state.interim) {
-      box.innerHTML = '<p class="empty">点上面的「开始录音」，你说的话会一段段落在这里。录音会发到服务端转成文字，转写只存进你的档案。</p>';
+      box.innerHTML = '';
       return;
     }
     var html = state.lines.map(function (l) {
@@ -5412,9 +5411,7 @@ body[data-view="ask"] #app{height:100dvh}
   function greet() {
     addBot([
       { h: '我在。我是小鹿——只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。',
-        t: '我在。我是小鹿，只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。' },
-      { h: '想记录，去「记录」页点右上「开始录音」，或把问诊内容贴进「手动整理」。想问档案里的旧事，就在这一页直接问。看不清药盒，去「识药」拍一张。',
-        t: '想记录，去记录页点右上开始录音，或把问诊内容贴进手动整理。想问档案里的旧事，就在这一页直接问。看不清药盒，去识药拍一张。' }
+        t: '我在。我是小鹿，只做一件事：把你看病时医生说的话，整理成一页能翻回去的记录。' }
     ], [], false);
   }
 
