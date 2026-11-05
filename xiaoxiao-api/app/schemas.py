@@ -148,6 +148,8 @@ class MedIn(BaseModel):
     freq: str = ""
     timing: str = ""
     days: str = ""
+    # 这味药在原文里的依据，供医生/本人核对
+    evidence: str = ""
 
 
 class RecordIn(BaseModel):
@@ -163,6 +165,11 @@ class RecordIn(BaseModel):
     conditions: list[str] = Field(default_factory=list)
     discontinued: list[str] = Field(default_factory=list)
     allergy_denied: bool = False
+    allergens: list[dict] = Field(default_factory=list)
+    reading: str = ""
+    self_check: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+    uncertain: list[str] = Field(default_factory=list)
     mode: str = "manual"
 
 
@@ -179,6 +186,7 @@ class RecordPatch(BaseModel):
     conditions: list[str] | None = None
     discontinued: list[str] | None = None
     allergy_denied: bool | None = None
+    allergens: list[dict] | None = None
 
 
 class RecordOut(BaseModel):
@@ -196,6 +204,11 @@ class RecordOut(BaseModel):
     conditions: list[str] = []
     discontinued: list[str] = []
     allergy_denied: bool = False
+    allergens: list[dict] = []
+    reading: str = ""
+    self_check: list[str] = []
+    confidence: float = 0.0
+    uncertain: list[str] = []
     mode: str
     created_at: datetime
 
@@ -216,6 +229,12 @@ class ExtractOut(BaseModel):
     notes: list[str]
     conditions: list[str] = []
     discontinued: list[str] = []
+    allergens: list[dict] = []
+    reading: str = ""
+    self_check: list[str] = []
+    confidence: float = 0.0
+    uncertain: list[str] = []
+    source: str = "rule"
     holes: list[str]
     transcript: str
 

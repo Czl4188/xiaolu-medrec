@@ -15,6 +15,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.agent import engine
 from app.api.deps import current_user, rate_limit
 from app.core.config import settings
 from app.db.models import User
@@ -27,7 +28,8 @@ MAX_IMAGE_CHARS = 6_000_000
 # 音频 base64 上限：约 9MB 原始音频，足够 3 分钟 opus
 MAX_AUDIO_CHARS = 12_000_000
 
-ASR_SYS = (
+# 统一走理解引擎的 TASK=transcribe（同一份提示词，不另写一套规则）
+ASR_SYS = engine.system_for("transcribe", "input_type = audio") if engine.BASE_PROMPT else (
     "你是语音转写器。只把音频里说的话逐字转成文字，不要回答、不要解释、不要总结、不要补充。"
     "听不清的地方留空，不要猜；没有语音就输出空字符串。"
 )
@@ -164,6 +166,51 @@ async def vision(body: VisionIn, _user: User = Depends(current_user)) -> dict:
     return {"text": text}
 
 
+class TTSIn(BaseModel):
+    text: str = Field(min_length=1, max_length=300)
+    voice: str = ""
+
+
+@router.post("/tts", dependencies=[Depends(rate_limit("ai:tts", 40))])
+async def tts(body: TTSIn, _user: User = Depends(current_user)) -> dict:
+    """文字转语音：返回 data URL，客户端写完本地文件即可播放。
+
+    小程序没有 speechSynthesis，只能由服务端合成音频；
+    不把音频 URL 直接给前端，避免多一个需要备案的下载域名。
+    """
+    text = " ".join(body.text.split())[:300]
+    if not text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "没有可朗读的内容")
+
+    url = settings.asr_diarize_base.rstrip("/") + "/api/v1/services/aigc/multimodal-generation/generation"
+    payload = {
+        "model": settings.tts_model,
+        "input": {"text": text, "voice": body.voice or settings.tts_voice},
+    }
+    headers = {"Authorization": f"Bearer {settings.llm_api_key}", "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.post(url, headers=headers, json=payload)
+            if r.status_code >= 400:
+                logger.warning("tts upstream %s: %s", r.status_code, r.text[:200])
+                raise HTTPException(status.HTTP_502_BAD_GATEWAY, "朗读服务暂时不可用")
+            data = r.json()
+            audio_url = (((data.get("output") or {}).get("audio") or {}).get("url") or "")
+            if not audio_url:
+                raise HTTPException(status.HTTP_502_BAD_GATEWAY, "朗读服务没有返回音频")
+            audio = await client.get(audio_url)
+            if audio.status_code >= 400 or not audio.content:
+                raise HTTPException(status.HTTP_502_BAD_GATEWAY, "朗读音频下载失败")
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("tts failed: %s", exc)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "朗读服务暂时不可用") from exc
+
+    b64 = base64.b64encode(audio.content).decode()
+    return {"audio": "data:audio/wav;base64," + b64, "chars": len(text)}
+
+
 @router.post("/asr", dependencies=[Depends(rate_limit("ai:asr", 20))])
 async def asr(body: dict, _user: User = Depends(current_user)) -> dict:
     """语音转写：浏览器录音（webm/opus、mp4、wav 的 data URL）→ 文字。
@@ -183,7 +230,7 @@ async def asr(body: dict, _user: User = Depends(current_user)) -> dict:
             {"type": "input_audio", "input_audio": {"data": audio}},
         ]},
     ]
-    text = await _call(
+    raw = await _call(
         messages,
         settings.asr_chat_model,
         temperature=0.0,
@@ -191,7 +238,13 @@ async def asr(body: dict, _user: User = Depends(current_user)) -> dict:
         timeout=90,
         extra={"modalities": ["text"]},
     )
-    return {"text": _clean_asr(text)}
+    parsed = engine.parse_transcribe(raw)
+    text = _clean_asr(parsed.get("text") or raw)
+    return {
+        "text": text,
+        "uncertain": parsed.get("uncertain") or [],
+        "segments": parsed.get("segments") or [],
+    }
 
 
 def _clean_asr(text: str) -> str:
@@ -492,6 +545,7 @@ async def asr_speakers(body: dict, _user: User = Depends(current_user)) -> dict:
         "text": text[:4000],
         "segments": segments[:200],
         "speakers": len(ids),
+        "uncertain": [],
         "engine": "diarize",
     }
 

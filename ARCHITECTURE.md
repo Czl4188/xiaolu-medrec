@@ -238,13 +238,13 @@ flowchart TD
 | DELETE | `/api/me` | 注销，需再次输入密码 |
 | GET/POST | `/api/records` | 列表 / 新建 |
 | GET/PATCH/DELETE | `/api/records/{id}` | 详情 / 修改 / 删除 |
-| POST | `/api/records/extract` | 文本抽取 |
+| POST | `/api/records/extract` | 文本抽取（`TASK=summarize`，失败退回规则 + 药名校对） |
 | POST | `/api/chat/sync` | 同步问答 |
 | POST | `/api/chat` | 流式问答（SSE） |
 | GET | `/api/ai/status` | 模型是否可用、模型名 |
 | POST | `/api/ai/chat` | 文本模型代理 |
 | POST | `/api/ai/vision` | 识图代理 |
-| POST | `/api/ai/asr` | 语音转写：data URL 音频 → 文字（qwen omni，单次 ≤ 约 9MB） |
+| POST | `/api/ai/asr` | 语音转写：data URL 音频 → 文字（走 `TASK=transcribe`，返回 `text` / `uncertain`） |
 | POST | `/api/ai/asr/speakers` | 说话人分离转写：返回 `segments[{speaker,text,begin,end}]`，按「医生 / 患者」分行 |
 | POST | `/api/geo/hospital` | 经纬度 → 附近医院名与地址（一次性解析，不落库、不回传坐标） |
 | GET | `/healthz` `/readyz` | 存活 / 就绪 |
@@ -308,5 +308,7 @@ Key 不进浏览器，换设备不用重填，也能统一限流和换模型。
 - 不做服药依从性记录：提醒只在本机（页内提示 / 系统通知 / 导出 .ics），
   勾掉「这一顿不再提醒」只是本地提醒状态，不上传、不参与问答，问答里仍答「没有服药记录」
 - 服务端不长期保存音频：转写时音频经 DashScope 临时存储（48 小时自动清理），只把转写文本写进档案
+- 理解引擎：`app/agent/engine.py` + `app/agent/prompts/lu_engine.txt`，三段共用一个 system 文本，按 `TASK` 切换；归纳与作答默认走 `ENGINE_MODEL`（默认 `qwen-flash`，失败回退 `LLM_MODEL`）
+- 模型输出不直接入库：药名带连接词、`evidence` 不在原文、疗程无「吃 X 天」原话、答案含越界词或数字不在 facts 里，都会在代码侧被丢弃并回退规则结果
 - 定位只用于一次性解析医院名：坐标不落库、不写日志；解析请求发往 OpenStreetMap 的 Photon 服务，不保存
 - 不把患者数据用于训练

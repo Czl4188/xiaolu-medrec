@@ -105,9 +105,15 @@ def is_configured() -> bool:
     return bool(settings.llm_api_key) and settings.llm_provider not in ("", "none")
 
 
-async def _call_once(model: str, messages: list[dict], timeout: float) -> tuple[str, dict]:
+async def _call_once(model: str, messages: list[dict], timeout: float,
+                    temperature: float = 0.2, response_format: str = "",
+                    max_tokens: int | None = None) -> tuple[str, dict]:
     url = settings.llm_base_url.rstrip("/") + "/chat/completions"
-    payload = {"model": model, "messages": messages, "temperature": 0.2, "stream": False}
+    payload = {"model": model, "messages": messages, "temperature": temperature, "stream": False}
+    if response_format:
+        payload["response_format"] = {"type": response_format}
+    if max_tokens:
+        payload["max_tokens"] = max_tokens
     headers = {"Authorization": f"Bearer {settings.llm_api_key}", "Content-Type": "application/json"}
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(timeout)) as client:
@@ -130,13 +136,20 @@ async def complete(
     *,
     user_id: str,
     run_id: str | None = None,
+    temperature: float = 0.2,
+    response_format: str = "",
+    max_tokens: int | None = None,
+    timeout: float | None = None,
+    model: str = "",
 ) -> str:
     if not is_configured():
         raise LLMNotConfigured("未配置模型")
 
-    models = [settings.llm_model]
-    if settings.llm_fallback_model and settings.llm_fallback_model != settings.llm_model:
-        models.append(settings.llm_fallback_model)
+    primary = (model or settings.llm_model).strip()
+    models = [primary]
+    for candidate in (settings.llm_fallback_model, settings.llm_model):
+        if candidate and candidate not in models:
+            models.append(candidate)
 
     last_error: Exception | None = None
     deadline = time.monotonic() + settings.llm_timeout_seconds * (settings.llm_max_retries + 1)
@@ -154,7 +167,11 @@ async def complete(
                     break
                 started = time.monotonic()
                 try:
-                    text, usage = await _call_once(model, messages, settings.llm_timeout_seconds)
+                    text, usage = await _call_once(
+                        model, messages, timeout or settings.llm_timeout_seconds,
+                        temperature=temperature, response_format=response_format,
+                        max_tokens=max_tokens,
+                    )
                     latency = int((time.monotonic() - started) * 1000)
                     breaker.on_success()
 

@@ -374,6 +374,10 @@ body[data-view="mine"] .appbar{border-bottom-color:var(--rule)}
   color:var(--muted);font-size:13px;line-height:1;cursor:pointer;
 }
 .dlgmed__del:hover{border-color:var(--accent);color:var(--accent)}
+.dlgmed__ev{
+  grid-column:1/-1;margin:2px 0 0;font-size:10.5px;line-height:1.55;color:var(--muted);
+  border-top:1px dashed var(--rule);padding-top:5px;
+}
 .dlgmeds__acts{display:flex;justify-content:flex-start;margin:0 0 8px}
 .dlgnote{width:100%;min-height:54px;padding:6px 8px;border:1px solid var(--rule-strong);border-radius:1px;background:var(--paper-2);font-family:var(--font-body);font-size:12.5px;resize:vertical}
 .dlghint{font-size:11px;color:var(--muted);line-height:1.6;margin:0}
@@ -659,6 +663,7 @@ body[data-view="ask"] #app{height:100dvh}
 .file-meta{margin:0 0 8px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.03em;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
 
 .transcript{display:grid;gap:6px;max-height:214px;overflow-y:auto;padding-right:2px;margin-bottom:4px}
+.evi{display:block;margin-top:3px;font-size:11px;line-height:1.6;color:var(--muted)}
 #trMeta:empty{display:none}
 .tr-line{display:grid;grid-template-columns:50px minmax(0,1fr);gap:8px;margin:0;font-size:12.5px;line-height:1.8;max-width:none}
 .tr-ts{font-family:var(--font-mono);font-size:9px;color:var(--muted);padding-top:4px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
@@ -2134,7 +2139,7 @@ body[data-view="ask"] #app{height:100dvh}
       transcript: r.transcript || '',
       meds: (r.meds || []).map(function (m) {
         return { name: m.name || '', dose: m.dose || '', freq: m.freq || '',
-                 timing: m.timing || '', days: m.days || '' };
+                 timing: m.timing || '', days: m.days || '', evidence: m.evidence || '' };
       }),
       followUp: r.follow_up || '',
       allergy: r.allergy || '',
@@ -2142,6 +2147,11 @@ body[data-view="ask"] #app{height:100dvh}
       conditions: r.conditions || [],
       discontinued: r.discontinued || [],
       notes: r.notes || [],
+      allergens: r.allergens || [],
+      reading: r.reading || '',
+      selfCheck: r.self_check || [],
+      confidence: r.confidence || 0,
+      uncertain: r.uncertain || [],
       mode: r.mode || 'manual'
     };
   }
@@ -2160,6 +2170,11 @@ body[data-view="ask"] #app{height:100dvh}
       conditions: d.conditions || [],
       discontinued: d.discontinued || [],
       allergy_denied: !!d.allergyDenied,
+      allergens: d.allergens || [],
+      reading: d.reading || '',
+      self_check: d.selfCheck || [],
+      confidence: d.confidence || 0,
+      uncertain: d.uncertain || [],
       mode: d.mode || 'manual'
     };
   }
@@ -2297,6 +2312,9 @@ body[data-view="ask"] #app{height:100dvh}
       meds: r.meds, follow_up: r.followUp, allergy: r.allergy,
       allergy_denied: !!r.allergyDenied,
       conditions: r.conditions || [], discontinued: r.discontinued || [],
+      allergens: r.allergens || [], reading: r.reading || '',
+      self_check: r.selfCheck || [], confidence: r.confidence || 0,
+      uncertain: r.uncertain || [],
       notes: r.notes, mode: r.mode
     };
   }
@@ -4115,7 +4133,8 @@ body[data-view="ask"] #app{height:100dvh}
           if (m.freq) bits.push(m.freq);
           if (m.timing) bits.push(m.timing);
           if (m.days) bits.push(m.days + ' 天');
-          return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</li>';
+          return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') +
+            (m.evidence ? '<span class="evi">依据：' + esc(m.evidence) + '</span>' : '') + '</li>';
         }).join('') + '</ul>'
       : '<p class="empty" style="margin:0 0 10px">这次没有提到用药。</p>';
 
@@ -4126,6 +4145,10 @@ body[data-view="ask"] #app{height:100dvh}
         '<dt>诊断</dt><dd>' + esc(r.summary || '未写明') + '</dd>' +
         '<dt>复诊</dt><dd>' + esc(r.followUp || '未提到') + '</dd>' +
         '<dt>过敏</dt><dd>' + esc(r.allergy || (r.allergyDenied ? '记录写「未发现过敏」' : '未记录（不等于没有）')) + '</dd>' +
+        ((r.allergens || []).length ? '<dt>过敏原</dt><dd>' + esc((r.allergens || []).map(function (a) {
+          var label = { positive: '阳性', denied: '否认', unknown: '说不清', family: '家属' }[a.status] || a.status;
+          return a.substance + '（' + label + (a.reaction ? ' · ' + a.reaction : '') + '）';
+        }).join('、')) + '</dd>' : '') +
         ((r.conditions || []).length
           ? '<dt>疾病/事件</dt><dd>' + esc(r.conditions.join('、')) + '</dd>' : '') +
         ((r.discontinued || []).length
@@ -4134,6 +4157,8 @@ body[data-view="ask"] #app{height:100dvh}
       '<p class="tl__label">用药</p>' + medHtml +
       (notes.length ? '<p class="tl__label">注意事项</p><ul class="ans-list">' +
         notes.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
+      ((r.uncertain || []).length ? '<p class="tl__label">转写存疑 · 请核对</p><ul class="ans-list">' +
+        r.uncertain.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
       '<p class="tl__label">完整转写 · ' + r.transcript.length + ' 字</p>' +
       '<p class="tr-full">' + esc(r.transcript) + '</p>' +
       '<div class="tl__acts">' +
@@ -4325,7 +4350,8 @@ body[data-view="ask"] #app{height:100dvh}
           if (m.freq) bits.push(m.freq);
           if (m.timing) bits.push(m.timing);
           if (m.days) bits.push(m.days + ' 天');
-          return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</li>';
+          return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') +
+            (m.evidence ? '<span class="evi">依据：' + esc(m.evidence) + '</span>' : '') + '</li>';
         }).join('') + '</ul>'
       : '<p class="rec-card__sub" style="margin:0 0 6px">这次没有提到用药。</p>';
 
@@ -5148,7 +5174,7 @@ body[data-view="ask"] #app{height:100dvh}
     return {
       name: (m && m.name) || '', dose: (m && m.dose) || '',
       freq: (m && m.freq) || '', timing: (m && m.timing) || '',
-      days: (m && m.days) || ''
+      days: (m && m.days) || '', evidence: (m && m.evidence) || ''
     };
   }
 
@@ -5174,6 +5200,11 @@ body[data-view="ask"] #app{height:100dvh}
       conditions: [],
       discontinued: [],
       notes: [],
+      allergens: [],
+      reading: '',
+      selfCheck: [],
+      confidence: 0,
+      uncertain: [],
       transcript: text,
       mode: mode,
       archived: false,
@@ -5197,6 +5228,8 @@ body[data-view="ask"] #app{height:100dvh}
     d.conditions = x.conditions || [];
     d.discontinued = x.discontinued || [];
     d.notes = x.notes || [];
+    d.allergens = x.allergens || [];
+    d.uncertain = x.uncertain || [];
     if (x.visitHint) { d.at = x.visitHint; d.atFromText = true; }
     d.extractState = 'ready';
   }
@@ -5225,6 +5258,12 @@ body[data-view="ask"] #app{height:100dvh}
     setIf('conditions', function () { d.conditions = x.conditions || []; });
     setIf('discontinued', function () { d.discontinued = x.discontinued || []; });
     setIf('notes', function () { d.notes = x.notes || []; });
+    setIf('allergens', function () {
+      d.allergens = x.allergens || [];
+      d.reading = x.reading || '';
+      d.selfCheck = x.self_check || [];
+      d.confidence = x.confidence || 0;
+    });
 
     var t = x.visit_hint || x.visit_at;
     if (t) {
@@ -5444,6 +5483,7 @@ body[data-view="ask"] #app{height:100dvh}
         field('freq', '频次', '每天一次') +
         field('timing', '服法', '饭前/饭后') +
         field('days', '天数', '14') +
+        (m.evidence ? '<p class="dlgmed__ev">依据：' + esc(m.evidence) + '</p>' : '') +
         '</div>';
     }).join('');
 
@@ -5513,6 +5553,12 @@ body[data-view="ask"] #app{height:100dvh}
       }
       meds.push(m);
     }
+    var orig = d.meds || [];
+    meds.forEach(function (m) {
+      for (var k = 0; k < orig.length; k++) {
+        if (orig[k] && orig[k].name === m.name && orig[k].evidence) { m.evidence = orig[k].evidence; break; }
+      }
+    });
     if (medBoxes.length) d.meds = meds;
   }
 
@@ -5583,6 +5629,11 @@ body[data-view="ask"] #app{height:100dvh}
       conditions: d.conditions || [],
       discontinued: d.discontinued || [],
       notes: d.notes,
+      allergens: d.allergens || [],
+      reading: d.reading || '',
+      selfCheck: d.selfCheck || [],
+      confidence: d.confidence || 0,
+      uncertain: d.uncertain || [],
       mode: d.mode
     };
 
@@ -5638,7 +5689,8 @@ body[data-view="ask"] #app{height:100dvh}
       notes: d.notes || [],
       conditions: d.conditions || [],
       discontinued: d.discontinued || [],
-      allergy_denied: !!d.allergyDenied
+      allergy_denied: !!d.allergyDenied,
+      allergens: d.allergens || []
     };
 
     function done(saved) {
@@ -6057,7 +6109,8 @@ body[data-view="ask"] #app{height:100dvh}
           P('这次（' + fmtDate(d.at) + '）一共提到 ' + namedMeds(d.meds).length + ' 种：'),
           P('<ul class="ans-list">' + namedMeds(d.meds).map(function (m) {
             var bits = [m.dose, m.freq, m.timing, m.days ? m.days + ' 天' : ''].filter(Boolean);
-            return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</li>';
+            return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') +
+            (m.evidence ? '<span class="evi">依据：' + esc(m.evidence) + '</span>' : '') + '</li>';
           }).join('') + '</ul>'),
           P(d.archived ? '这份已经归档了。' : '这份还没归档。点「保存到档案」，或在左边记录卡上保存。')
         ], [{ label: '本次转写 · ' + fmtDate(d.at) }], true);
@@ -6114,7 +6167,8 @@ body[data-view="ask"] #app{height:100dvh}
           P('按 <span class="hl">' + fmtDate(sr.at) + ' ' + esc(sr.hospital) + '</span> 那次记录，共 ' + sr.meds.length + ' 种：'),
           P('<ul class="ans-list">' + sr.meds.map(function (m) {
             var bits = [m.dose, m.freq, m.timing, m.days ? m.days + ' 天' : ''].filter(Boolean);
-            return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</li>';
+            return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') +
+            (m.evidence ? '<span class="evi">依据：' + esc(m.evidence) + '</span>' : '') + '</li>';
           }).join('') + '</ul>'),
           more
         ].filter(Boolean), [{ label: cite(sr) }], true);
@@ -6183,7 +6237,8 @@ body[data-view="ask"] #app{height:100dvh}
         P('按 <span class="hl">' + fmtDate(last.at) + '</span> 那次记录，一共 ' + last.meds.length + ' 种：'),
         P('<ul class="ans-list">' + last.meds.map(function (m) {
           var bits = [m.dose, m.freq, m.timing, m.days ? m.days + ' 天' : ''].filter(Boolean);
-          return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</li>';
+          return '<li><b>' + esc(m.name) + '</b>' + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') +
+            (m.evidence ? '<span class="evi">依据：' + esc(m.evidence) + '</span>' : '') + '</li>';
         }).join('') + '</ul>'),
         P('这是记录里医生说的，不是我的建议。剂量和天数以处方为准。')
       ], [{ label: cite(last) }], true);

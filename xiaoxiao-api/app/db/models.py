@@ -119,6 +119,13 @@ class Record(Base):
     discontinued: Mapped[list] = mapped_column(JSON, default=list)
     # 明确否认过敏（「没有过敏」）：与 allergy 互斥，避免把否认记成过敏史
     allergy_denied: Mapped[bool] = mapped_column(default=False)
+    # 过敏原明细：substance / kind / status(positive|denied|unknown|family) / reaction / evidence
+    allergens: Mapped[list] = mapped_column(JSON, default=list)
+    # 理解引擎的留痕：先读懂（reading）、自查（self_check）、置信度、转写存疑项
+    reading: Mapped[str] = mapped_column(Text, default="")
+    self_check: Mapped[list] = mapped_column(JSON, default=list)
+    confidence: Mapped[float] = mapped_column(default=0.0)
+    uncertain: Mapped[list] = mapped_column(JSON, default=list)
     mode: Mapped[str] = mapped_column(String(16), default="manual")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 

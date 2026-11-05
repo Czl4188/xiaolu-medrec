@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com/v1"
     llm_api_key: str = ""
     llm_model: str = "deepseek-chat"
+    # 理解引擎（summarize / answer）默认用更快的小模型；留空则跟随 llm_model
+    engine_model: str = "qwen-flash"
     llm_vision_model: str = "qwen3-vl-plus"   # 识图模型（兼容 OpenAI 多模态格式）
     llm_fallback_model: str = ""         # 主模型熔断后的备用模型
     llm_timeout_seconds: float = 25.0
@@ -85,6 +87,9 @@ class Settings(BaseSettings):
     asr_diarize_base: str = "https://dashscope.aliyuncs.com"
     asr_diarize_model: str = "qwen-audio-3.0-asr-flash-filetrans"
     asr_diarize_timeout: float = 75.0
+    # 语音朗读：qwen3-tts-flash 走 DashScope 多模态接口，返回音频 URL
+    tts_model: str = "qwen3-tts-flash"
+    tts_voice: str = "Cherry"
 
     # —— 任务 ——
     job_poll_interval: float = 1.0

@@ -1049,3 +1049,84 @@ def test_geo_rejects_bad_coordinates(client, fresh_headers):
     r = client.post("/api/geo/hospital", headers=fresh_headers,
                     json={"lat": 31.22, "lon": "abc"})
     assert r.status_code == 422
+
+# ————————————————— 理解引擎守门 —————————————————
+def test_engine_rejects_merged_med_name():
+    from app.agent.engine import accept_med
+    text = "医生：阿莫西林胶囊和克拉霉素片，各吃两周。"
+    assert not accept_med({"name": "阿莫西林胶囊和克拉霉素片", "evidence": "阿莫西林胶囊和克拉霉素片"}, text)
+    assert accept_med({"name": "阿莫西林胶囊", "evidence": "阿莫西林胶囊"}, text)
+
+
+def test_engine_rejects_evidence_not_in_transcript():
+    from app.agent.engine import accept_med
+    text = "医生：开奥美拉唑 20mg，每天两次。"
+    assert accept_med({"name": "奥美拉唑", "evidence": "开奥美拉唑 20mg，每天两次"}, text)
+    assert not accept_med({"name": "奥美拉唑", "evidence": "连续服用八周"}, text)
+
+
+def test_engine_allergen_rules():
+    from app.agent.engine import accept_allergen
+    text = "患者：没有药物过敏，但对磺胺过敏。"
+    assert accept_allergen({"substance": "药物", "status": "denied"}, text)
+    assert accept_allergen({"substance": "磺胺", "status": "positive"}, text)
+    assert not accept_allergen({"substance": "海鲜", "status": "positive"}, text)
+
+
+def test_engine_answer_guard():
+    from app.agent.engine import check_answer
+    facts = "[R1] 2026年11月05日 市第一人民医院\n用药：氨氯地平·5mg·每天一次"
+    assert check_answer("氨氯地平 5mg，每天一次 [R1]", facts)
+    assert not check_answer("可能是血压没控制好，建议加量", facts)
+    assert not check_answer("改成 10mg 每天一次 [R1]", facts)
+
+
+def test_extract_returns_engine_fields(client, fresh_headers):
+    r = client.post("/api/records/extract", headers=fresh_headers,
+                    json={"text": "医生：开奥美拉唑 20mg，每天两次，饭前吃。两周后复诊。"})
+    assert r.status_code == 200
+    data = r.json()
+    for key in ("allergens", "reading", "self_check", "uncertain", "source", "confidence"):
+        assert key in data
+    assert data["source"] in ("rule", "engine")
+
+
+def test_record_keeps_evidence_and_allergens(client, fresh_headers):
+    payload = {
+        "client_id": "engine_roundtrip",
+        "visit_at": "2026-11-05T09:00:00+08:00",
+        "hospital": "市第一人民医院",
+        "summary": "高血压",
+        "transcript": "医生：开氨氯地平 5mg，每天一次。",
+        "meds": [{"name": "氨氯地平", "dose": "5mg", "freq": "每天一次",
+                  "timing": "早上", "days": "", "evidence": "开氨氯地平 5mg，每天一次"}],
+        "allergens": [{"substance": "青霉素", "kind": "drug", "status": "positive",
+                       "reaction": "起疹子", "evidence": "对青霉素过敏"}],
+        "reading": "一种药，一次复诊",
+        "self_check": ["1. 数了 1 种药，输出 1 条"],
+        "confidence": 0.92,
+        "uncertain": ["奥美拉搓→奥美拉唑"],
+    }
+    r = client.post("/api/records", headers=fresh_headers, json=payload)
+    assert r.status_code == 201
+    data = r.json()
+    assert data["meds"][0]["evidence"] == "开氨氯地平 5mg，每天一次"
+    assert data["allergens"][0]["substance"] == "青霉素"
+    assert data["confidence"] == 0.92
+    assert data["uncertain"] == ["奥美拉搓→奥美拉唑"]
+
+    got = client.get(f"/api/records/{data['id']}", headers=fresh_headers).json()
+    assert got["allergens"][0]["status"] == "positive"
+    assert got["reading"] == "一种药，一次复诊"
+
+
+def test_engine_drops_days_without_evidence():
+    from app.agent.engine import _normalize_meds
+    text = "医生：开氨氯地平 5mg，每天一次，两周后复诊。"
+    meds = _normalize_meds([{"name": "氨氯地平", "dose": "5mg", "freq": "每天一次",
+                             "days": "14", "evidence": "开氨氯地平 5mg，每天一次"}], text)
+    assert meds[0]["days"] == ""
+    meds2 = _normalize_meds([{"name": "氨氯地平", "dose": "5mg", "freq": "每天一次",
+                              "days": "14", "evidence": "氨氯地平吃 14 天"}],
+                            "医生：氨氯地平吃 14 天，每天一次。")
+    assert meds2[0]["days"] == "14"
