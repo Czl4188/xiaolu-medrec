@@ -1036,3 +1036,16 @@ def test_admin_can_reset_credentials(client):
         assert bad.status_code == 409
     finally:
         settings.admin_token = saved
+# ————————————————— 定位解析 —————————————————
+def test_geo_requires_login(client):
+    r = client.post("/api/geo/hospital", json={"lat": 31.22, "lon": 121.44})
+    assert r.status_code == 401
+
+
+def test_geo_rejects_bad_coordinates(client, fresh_headers):
+    r = client.post("/api/geo/hospital", headers=fresh_headers,
+                    json={"lat": 999, "lon": 121.44})
+    assert r.status_code == 422
+    r = client.post("/api/geo/hospital", headers=fresh_headers,
+                    json={"lat": 31.22, "lon": "abc"})
+    assert r.status_code == 422

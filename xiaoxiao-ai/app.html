@@ -521,6 +521,9 @@ body[data-view="ask"] .btn--rec{display:inline-flex}
 .home__side:hover .meta{color:var(--on-ink-dim-2)}
 .home__side:hover::after{transform:translate(3px,-50%);opacity:1}
 
+.geo-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 2px}
+.geo-row .btn{display:inline-flex;align-items:center;gap:6px}
+.geo-row .meta{color:var(--muted);overflow-wrap:anywhere}
 .home__note{margin-top:24px;font-family:var(--font-hand);font-size:13px;line-height:1.7;color:var(--muted)}
 .home__note b{font-weight:400;color:var(--ink-2);border-bottom:1px solid var(--rule-strong)}
 
@@ -1305,6 +1308,18 @@ body[data-view="ask"] #app{height:100dvh}
         </button>
       </div>
 
+      <div class="geo-row">
+        <button class="btn btn--ghost btn--mini" id="geoBtn" type="button">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none"
+               stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"></path>
+            <circle cx="12" cy="10" r="2.6"></circle>
+          </svg>
+          <span id="geoBtnTx">获取当前医院位置</span>
+        </button>
+        <span class="meta" id="geoNow">未获取位置</span>
+      </div>
+
       <p class="home__note">
         语音识别由浏览器提供的服务完成，可能经由浏览器厂商的云端；转写后的文字才存进你的档案。
         <b>小鹿不做诊断</b>，内容不构成诊疗建议。
@@ -1694,6 +1709,46 @@ body[data-view="ask"] #app{height:100dvh}
   </nav>
 </div>
 
+<!-- ——————————————— 定位获取医院（同意 / 手动填写） ——————————————— -->
+<dialog class="sheet-dialog" id="geoDialog" aria-labelledby="geoTitle" style="max-width:520px">
+  <div>
+    <div class="sheet-dialog__head">
+      <span class="meta">就诊医院</span>
+      <span class="meta mono">定位</span>
+    </div>
+    <h2 class="sheet-dialog__ttl" id="geoTitle">获取当前医院位置</h2>
+    <p class="sheet-dialog__txt">
+      需要获取位置用于记录本次就诊医院。坐标只用于本次地址解析，不保存、不写入档案；解析由 OpenStreetMap 完成。
+    </p>
+    <p class="sheet-dialog__txt">定位信息只会跟着当前账号保存在这台设备上。</p>
+    <div class="sheet-dialog__actions">
+      <button class="btn btn--ghost" type="button" id="geoCancel">取消</button>
+      <button class="btn btn--primary" type="button" id="geoAllow">允许定位</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="sheet-dialog" id="geoManualDialog" aria-labelledby="geoManualTitle" style="max-width:480px">
+  <form method="dialog" id="geoManualForm" novalidate>
+    <div class="sheet-dialog__head">
+      <span class="meta">就诊医院</span>
+      <span class="meta mono" id="geoSource">手动填写</span>
+    </div>
+    <h2 class="sheet-dialog__ttl" id="geoManualTitle">无法获取位置，请手动填写医院名称</h2>
+    <p class="sheet-dialog__txt" id="geoManualText">请填写医院名称，保存后会带到这次记录。</p>
+    <label class="field">
+      <span class="field__k">医院名称</span>
+      <input class="field__in" id="geoHospitalInput" type="text" maxlength="40"
+             placeholder="例如：市第一人民医院" autocomplete="off">
+    </label>
+    <p class="gate__err" id="geoErr"></p>
+    <div class="sheet-dialog__actions">
+      <button class="btn btn--primary" value="save" id="geoManualSave" type="submit">保存医院</button>
+      <button class="btn btn--ghost" value="cancel" type="button" id="geoManualCancel">取消</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- ——————————————— 归档确认（桌面弹窗外壳） ——————————————— -->
 <dialog class="sheet-dialog" id="saveDialog" aria-labelledby="saveTitle" style="max-width:640px">
   <form method="dialog">
@@ -1891,7 +1946,8 @@ body[data-view="ask"] #app{height:100dvh}
     theme: function () { return 'lx_theme_v1_' + acctKey(); },   // 账号隔离的主题
     ai: function () { return 'lx_ai_v1_' + acctKey(); },         // 账号隔离的千问配置
     scan: function () { return 'lx_scan_v1_' + acctKey(); },      // 账号隔离的识药记录
-    remind: function () { return 'lx_remind_v1_' + acctKey(); }   // 账号隔离的用药提醒设置与打卡
+    remind: function () { return 'lx_remind_v1_' + acctKey(); },  // 账号隔离的用药提醒设置与打卡
+    geo: function () { return 'lx_geo_v1_' + acctKey(); }        // 账号隔离的最近一次就诊医院
   };
 
   /* 用手机号登录后，用户名不再唯一；表单按模式显示不同字段 */
@@ -1942,7 +1998,7 @@ body[data-view="ask"] #app{height:100dvh}
     var flag = 'lx_keys_v2_' + acct;
     try {
       if (localStorage.getItem(flag)) return;
-      ['lx_user_v1_', 'lx_records_v1_', 'lx_theme_v1_', 'lx_ai_v1_', 'lx_scan_v1_', 'lx_cal_v1_', 'lx_remind_v1_']
+      ['lx_user_v1_', 'lx_records_v1_', 'lx_theme_v1_', 'lx_ai_v1_', 'lx_scan_v1_', 'lx_cal_v1_', 'lx_remind_v1_', 'lx_geo_v1_']
         .forEach(function (pre) {
           var from = pre + name, to = pre + acct;
           var old = localStorage.getItem(from);
@@ -2150,6 +2206,7 @@ body[data-view="ask"] #app{height:100dvh}
     startClock();
     bindGlobal();
     bindLogin();
+    bindGeo();
     bindProfile();
     bindWorkbench();
     bindVoice();
@@ -2536,6 +2593,7 @@ body[data-view="ask"] #app{height:100dvh}
           localStorage.removeItem(LS.ai());
           localStorage.removeItem(LS.scan());
           localStorage.removeItem(LS.remind());
+          localStorage.removeItem(LS.geo());
           localStorage.removeItem('lx_cal_v1_' + state.acct);
           localStorage.removeItem('lx_keys_v2_' + state.acct);
           localStorage.removeItem(LS.session);
@@ -2818,6 +2876,8 @@ body[data-view="ask"] #app{height:100dvh}
     state.acct = acct || ('u:' + name);
     migrateLocalKeys(state.acct, name);
     loadLocalAccount(name);
+    geoLoad();
+    geoRender();
     rmStart();          // 用药提醒：读本机设置并开始到点检查
 
     if (API.on) {
@@ -2884,6 +2944,161 @@ body[data-view="ask"] #app{height:100dvh}
 
     syncIdentity();
     go('home');
+  }
+
+  /* ============================================================
+     4.5 定位获取就诊医院
+     坐标只用于本次解析，不写档案；医院名跟着账号存本机。
+     ============================================================ */
+  var GEO = { last: null, busy: false };
+
+  function geoLoad() {
+    var v = read(LS.geo(), null);
+    GEO.last = (v && typeof v === 'object' && clean(v.name)) ? {
+      name: clean(v.name), address: clean(v.address), at: +v.at || Date.now()
+    } : null;
+  }
+
+  function geoStore() {
+    if (!acctKey()) return;
+    if (GEO.last) write(LS.geo(), GEO.last);
+    else {
+      try { localStorage.removeItem(LS.geo()); } catch (e) {}
+    }
+  }
+
+  function geoRender() {
+    var el = $('#geoNow');
+    if (!el) return;
+    if (GEO.last && GEO.last.name) {
+      el.textContent = GEO.last.name;
+      el.title = GEO.last.address || '';
+    } else {
+      el.textContent = '未获取位置';
+      el.title = '';
+    }
+  }
+
+  function geoBusy(on) {
+    GEO.busy = !!on;
+    var b = $('#geoBtn');
+    var t = $('#geoBtnTx');
+    if (b) b.disabled = !!on;
+    if (t) t.textContent = on ? '定位中…' : '获取当前医院位置';
+  }
+
+  function geoApply(name, address) {
+    name = clean(name);
+    if (!name) return;
+    GEO.last = { name: name, address: clean(address), at: Date.now() };
+    geoStore();
+    geoRender();
+    if (state.draft && !state.draft.archived) {
+      state.draft.hospital = name;
+      if ($('#saveDialog').open) fillSaveForm();
+      renderRecordPanel();
+    }
+    toast('已记录医院：' + name);
+  }
+
+  function geoManual(title, address) {
+    $('#geoManualTitle').textContent = title || '请手动填写医院名称';
+    $('#geoManualText').textContent = address
+      ? '附近地址：' + address + '。没认出医院名称的话，直接填医院名。'
+      : '请填写医院名称，保存后会带到这次记录。';
+    var input = $('#geoHospitalInput');
+    input.value = (state.draft && state.draft.hospital) || (GEO.last && GEO.last.name) || '';
+    $('#geoErr').textContent = '';
+    $('#geoSource').textContent = '手动填写';
+    openDialog($('#geoManualDialog'));
+    setTimeout(function () { try { input.focus(); input.select(); } catch (e) {} }, 60);
+  }
+
+  function geoLocate() {
+    if (!navigator.geolocation) {
+      geoManual('无法获取位置，请手动填写医院名称', '');
+      return;
+    }
+    geoBusy(true);
+    var settled = false;
+    var timer = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      geoBusy(false);
+      geoManual('无法获取位置，请手动填写医院名称', '');
+    }, 16000);
+
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      if (settled) return;
+      clearTimeout(timer);
+      if (!API.on) {
+        settled = true;
+        geoBusy(false);
+        geoManual('本机模式无法解析地址，请手动填写医院名称', '');
+        return;
+      }
+      var lat = Number(pos.coords.latitude).toFixed(6);
+      var lon = Number(pos.coords.longitude).toFixed(6);
+      apiFetch('/api/geo/hospital', { method: 'POST', body: { lat: +lat, lon: +lon } })
+        .then(function (r) {
+          var name = clean(r && r.hospital);
+          if (name) geoApply(name, r.address || '');
+          else geoManual('没有识别出医院名称，请手动填写', clean(r && r.address));
+        })
+        .catch(function () {
+          geoManual('地址解析失败，请手动填写医院名称', '');
+        })
+        .then(function () {
+          settled = true;
+          geoBusy(false);
+        });
+    }, function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      geoBusy(false);
+      geoManual('无法获取位置，请手动填写医院名称', '');
+    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+  }
+
+  function bindGeo() {
+    var b = $('#geoBtn');
+    if (b && !b.getAttribute('data-bound')) {
+      b.setAttribute('data-bound', '1');
+      b.addEventListener('click', function () {
+        if (GEO.busy) return;
+        openDialog($('#geoDialog'));
+      });
+    }
+    var allow = $('#geoAllow');
+    if (allow && !allow.getAttribute('data-bound')) {
+      allow.setAttribute('data-bound', '1');
+      allow.addEventListener('click', function () {
+        closeDialog($('#geoDialog'));
+        geoLocate();
+      });
+    }
+    var cancel = $('#geoCancel');
+    if (cancel && !cancel.getAttribute('data-bound')) {
+      cancel.setAttribute('data-bound', '1');
+      cancel.addEventListener('click', function () { closeDialog($('#geoDialog')); });
+    }
+    var mcancel = $('#geoManualCancel');
+    if (mcancel && !mcancel.getAttribute('data-bound')) {
+      mcancel.setAttribute('data-bound', '1');
+      mcancel.addEventListener('click', function () { closeDialog($('#geoManualDialog')); });
+    }
+    var form = $('#geoManualForm');
+    if (form && !form.getAttribute('data-bound')) {
+      form.setAttribute('data-bound', '1');
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var name = clean($('#geoHospitalInput').value);
+        if (!name) { $('#geoErr').textContent = '请填写医院名称。'; return; }
+        closeDialog($('#geoManualDialog'));
+        geoApply(name, '');
+      });
+    }
   }
 
   /* ============================================================
@@ -3594,6 +3809,7 @@ body[data-view="ask"] #app{height:100dvh}
     }
     $('#homeFacts').innerHTML = html;
     $('#homeRecCount').textContent = state.records.length + ' 份记录';
+    geoRender();
   }
 
   /* 身份证只显示后四位，首页/我的都能看到"已保存"，又不会到处暴露全号 */
@@ -4925,7 +5141,7 @@ body[data-view="ask"] #app{height:100dvh}
       clientId: newClientId(),
       at: hint || now,
       atFromText: !!hint,
-      hospital: '',
+      hospital: (GEO.last && GEO.last.name) || '',
       summary: '',
       meds: [],
       followUp: '',
@@ -4948,7 +5164,7 @@ body[data-view="ask"] #app{height:100dvh}
 
   function applyLocalExtract(d, x) {
     if (!d || !x) return;
-    d.hospital = x.hospital || '';
+    if (!d.hospital) d.hospital = x.hospital || '';
     d.summary = x.summary || '';
     d.meds = (x.meds || []).map(cloneMed);
     d.followUp = x.followUp || '';
@@ -4972,7 +5188,9 @@ body[data-view="ask"] #app{height:100dvh}
       apply();
     }
 
-    setIf('hospital', function () { d.hospital = x.hospital || ''; });
+    setIf('hospital', function () {
+      if (!d.hospital) d.hospital = x.hospital || (GEO.last && GEO.last.name) || '';
+    });
     setIf('summary', function () { d.summary = x.summary || ''; });
     setIf('meds', function () { d.meds = (x.meds || []).map(cloneMed); });
     setIf('follow', function () { d.followUp = x.follow_up || ''; });
@@ -5313,6 +5531,12 @@ body[data-view="ask"] #app{height:100dvh}
 
     // 归档前用户可能改过字段，以表单里的值为准
     readSaveForm();
+    if (GEO.last && clean(d.hospital) && clean(d.hospital) !== GEO.last.name) {
+      GEO.last.name = clean(d.hospital);
+      GEO.last.at = Date.now();
+      geoStore();
+      geoRender();
+    }
 
     /* 服务端整理失败时是全手工模式：空白记录不允许存 */
     if (API.on && d.extractState === 'failed' &&

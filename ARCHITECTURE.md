@@ -246,6 +246,7 @@ flowchart TD
 | POST | `/api/ai/vision` | 识图代理 |
 | POST | `/api/ai/asr` | 语音转写：data URL 音频 → 文字（qwen omni，单次 ≤ 约 9MB） |
 | POST | `/api/ai/asr/speakers` | 说话人分离转写：返回 `segments[{speaker,text,begin,end}]`，按「医生 / 患者」分行 |
+| POST | `/api/geo/hospital` | 经纬度 → 附近医院名与地址（一次性解析，不落库、不回传坐标） |
 | GET | `/healthz` `/readyz` | 存活 / 就绪 |
 
 鉴权统一用 `X-Xiaolu-Token`。
@@ -307,4 +308,5 @@ Key 不进浏览器，换设备不用重填，也能统一限流和换模型。
 - 不做服药依从性记录：提醒只在本机（页内提示 / 系统通知 / 导出 .ics），
   勾掉「这一顿不再提醒」只是本地提醒状态，不上传、不参与问答，问答里仍答「没有服药记录」
 - 服务端不长期保存音频：转写时音频经 DashScope 临时存储（48 小时自动清理），只把转写文本写进档案
+- 定位只用于一次性解析医院名：坐标不落库、不写日志；解析请求发往 OpenStreetMap 的 Photon 服务，不保存
 - 不把患者数据用于训练

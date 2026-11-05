@@ -20,6 +20,7 @@ from app.api import (
     routes_ai,
     routes_auth,
     routes_chat,
+    routes_geo,
     routes_health,
     routes_me,
     routes_ops,
@@ -139,7 +140,7 @@ def create_app() -> FastAPI:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         response.headers["Permissions-Policy"] = (
-            "microphone=(self), camera=(self), geolocation=(), payment=()"
+            "microphone=(self), camera=(self), geolocation=(self), payment=()"
         )
         # 单文件前端用内联脚本/样式；connect-src 放开 https 是为了允许用户自配模型网关
         response.headers["Content-Security-Policy"] = (
@@ -168,7 +169,7 @@ def create_app() -> FastAPI:
         )
         return response
 
-    for module in (routes_health, routes_auth, routes_me, routes_records, routes_chat, routes_ai, routes_admin, routes_ops):
+    for module in (routes_health, routes_auth, routes_me, routes_records, routes_chat, routes_ai, routes_geo, routes_admin, routes_ops):
         app.include_router(module.router)
 
     @app.exception_handler(Exception)
