@@ -824,6 +824,26 @@ body[data-view="ask"] #app{height:100dvh}
 .sheet-dialog__sum dd{margin:0;font-family:var(--font-display);font-size:12.5px;font-weight:700;line-height:1.4}
 .sheet-dialog__actions{display:flex;flex-wrap:wrap;gap:9px}
 .sheet-dialog__actions .btn{flex:1 1 auto}
+/* 归档弹窗：医生复审提示（醒目提示条，主题自适应） */
+.sheet-dialog__alert{
+  display:flex;align-items:center;gap:10px;
+  margin:0 0 14px;padding:12px 13px;
+  background:var(--amber-wash);border:1px solid var(--amber);border-left:3px solid var(--amber);
+  color:var(--amber-ink);
+}
+.sheet-dialog__alert .badge{
+  flex:none;width:20px;height:20px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--amber);color:var(--paper-2);
+  font-family:var(--font-display);font-size:13px;font-weight:700;line-height:1;
+}
+.sheet-dialog__alert b{
+  font-family:var(--font-display);font-size:13px;font-weight:700;line-height:1.65;
+}
+@media (max-width:390px){
+  .sheet-dialog__alert{padding:10px 11px;gap:8px}
+  .sheet-dialog__alert b{font-size:12.5px}
+}
 
 
 .toast{
@@ -1757,6 +1777,10 @@ body[data-view="ask"] #app{height:100dvh}
       <span class="meta mono" id="dlgId">v_00000000_0000</span>
     </div>
     <h2 class="sheet-dialog__ttl" id="saveTitle">把这次会诊存进档案吗？</h2>
+    <div class="sheet-dialog__alert" role="note">
+      <span class="badge" aria-hidden="true">!</span>
+      <b>为保证档案正确性严谨性 请将此档案交由医生复审一遍</b>
+    </div>
     <p class="sheet-dialog__txt" id="dlgText">
       保存前可以逐项修改；确认后才写进你账号的档案，之后的提问会用到它。
     </p>
