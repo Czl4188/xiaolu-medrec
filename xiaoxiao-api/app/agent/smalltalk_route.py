@@ -27,6 +27,20 @@ SYMPTOM = re.compile(
 )
 _OWN = re.compile(r"我|自己|这个|最近")
 
+# 个体化医学问题：即便归一是 out_of_scope，也不交给对话层自由作答
+MED_ASK = re.compile(
+    r"能不能|可不可以|要不要|该不该|需不需要|严重|要紧|怎么治|如何治疗|"
+    r"吃什么|吃啥|喝什么|忌口|是不是|会不会|有没有事|怎么回事|"
+    r"什么病|啥病|预后|癌变|传染|多久能好|能不能好|"
+    r"哪个好|哪种好|哪个更|有什么区别"
+)
+# 问的是小鹿自己怎么用：这类问题即使带「我」也可以直接答
+APP_Q = re.compile(
+    r"小鹿|App|app|应用|软件|导出|备份|账号|登录|注册|主题|提醒|日历|"
+    r"怎么用|怎么弄|在哪|哪里找|怎么设置"
+)
+
+
 # 需要排除的分支：命中任意一个就说明是档案/医疗问题
 _BRANCHES = (
     "EMERGENCY", "ADVICE", "MED_Q", "DOSE_Q", "FOLLOW_Q", "ALLERGY_Q",
@@ -37,6 +51,30 @@ _BRANCHES = (
 
 def is_crisis(question: str) -> bool:
     return bool(CRISIS.search(str(question or "")))
+
+
+def simple_answerable(question: str) -> bool:
+    """True = 可以不查档案、由对话层直接给一个简单答案。
+
+    用于归一把问题判成 out_of_scope 之后：科普、常识、App 用法可以答；
+    只要沾上个体化医学判断、用法用量、症状，就仍然走固定拒答。
+    """
+    text = str(question or "").strip()
+    if not text or len(re.sub(r"[\s\W_]+", "", text)) <= 1:
+        return False
+    if CRISIS.search(text) or MED_ASK.search(text) or SYMPTOM.search(text):
+        return False
+
+    from app.agent import answer as A
+
+    for name in ("EMERGENCY", "ADVICE", "MED_Q", "DOSE_Q", "DIAGNOSIS_Q", "ALLERGY_Q", "ADHERENCE"):
+        pattern = getattr(A, name, None)
+        if pattern is not None and pattern.search(text):
+            return False
+    if APP_Q.search(text):
+        return True
+    # 带「我/自己」的问题默认涉及本人情况，不自由作答
+    return not _OWN.search(text)
 
 
 def is_smalltalk(question: str, vocab=()) -> bool:

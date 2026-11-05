@@ -1300,3 +1300,35 @@ def test_symptom_only_gets_boundary_answer():
     # 提到档案里的病名/药名，就不能拦成「只有症状」
     assert _route_only({"intent": "diagnosis"}, recs, "我这个支气管哮喘又犯了，难受") is None
     assert _route_only({"intent": "medication"}, recs, "奥美拉唑吃了难受") is None
+
+
+def test_simple_questions_can_be_answered_without_archive():
+    from app.agent.smalltalk_route import simple_answerable
+
+    assert simple_answerable("阿莫西林是干什么的")
+    assert simple_answerable("什么是胃炎")
+    assert simple_answerable("导出记录怎么弄")
+    assert not simple_answerable("我最近失眠是不是抑郁了")
+    assert not simple_answerable("要不要停药")
+    assert not simple_answerable("牙疼怎么办")
+    assert not simple_answerable("布洛芬和对乙酰氨基酚哪个好")
+
+
+def test_out_of_scope_simple_goes_to_chat_layer():
+    from app.api.routes_chat import _route_only
+
+    recs = _cond_records()
+    free = _route_only({"intent": "out_of_scope"}, recs, "阿莫西林是干什么的")
+    assert free["mode"] == "free" and free["refused"] is False
+    # 求建议仍然固定拒答，不给模型发挥空间
+    fixed = _route_only({"intent": "out_of_scope"}, recs, "我这个药能不能停")
+    assert fixed["mode"] == "out_of_scope" and fixed["refused"] is True
+
+
+def test_answer_guard_rejects_made_up_days():
+    from app.agent.engine import check_answer
+
+    facts = "[R1] 2026年10月30日 市第一人民医院\n用药：奥美拉唑肠溶胶囊·20mg·每天一次·14 天"
+    assert check_answer("查到了，10 月 30 日那次开了奥美拉唑。[R1]", facts)
+    assert not check_answer("奥美拉唑要吃 21 天。[R1]", facts), "天数必须有依据"
+    assert not check_answer('{"intent":"medication"}', facts), "JSON 契约不是答案"
