@@ -2219,6 +2219,7 @@ body[data-view="ask"] #app{height:100dvh}
     interim: '',
     draft: null,         // 本次还未归档的记录
     chatReady: false,
+    chatLog: [],         // 最近 10 轮对话：只给服务端消解指代，不作为事实来源
     busy: false,
     cloud: false,        // 是否已连上服务端
     saving: false,       // 归档 / 修改请求进行中
@@ -2846,6 +2847,7 @@ body[data-view="ask"] #app{height:100dvh}
     state.draft = null;
     state.lines = [];
     state.chatReady = false;
+    state.chatLog = [];
     state.consentSeen = false;
     state.ai = null;
     state.aiOn = false;
@@ -5788,7 +5790,11 @@ body[data-view="ask"] #app{height:100dvh}
     if (!q) { input.focus(); return; }
     if (state.busy) { toast('上一条还在答，稍等一下再发。'); return; }
 
+    /* 只带最近 10 轮，且先取再入栈：当前这句由 question 单独传 */
+    var history = state.chatLog.slice(-20);
+
     addUser(q);
+    remember('user', q);
     input.value = '';
     autoGrow();
     state.busy = true;
@@ -5802,11 +5808,16 @@ body[data-view="ask"] #app{height:100dvh}
 
     /* 有服务端就以服务端结论为准：急症兜底、拒答规则、临床实体守卫都在那边 */
     if (API.on) {
-      apiFetch('/api/chat/sync', { method: 'POST', body: { question: q } })
+      apiFetch('/api/chat/sync', { method: 'POST', body: { question: q, history: history } })
         .then(function (res) {
           state.busy = false;
           holder.remove();
-          addBot(buildCloudParas(res), buildCloudSources(res), !res.refused || /120|急诊/.test(res.answer));
+          remember('assistant', res.answer);
+          var kind = res.kind || '';
+          /* 闲聊与危机话术不该挂「病历整理」的免责声明 */
+          var medical = (kind === 'smalltalk' || kind === 'crisis')
+            ? false : (!res.refused || /120|急诊/.test(res.answer));
+          addBot(buildCloudParas(res), buildCloudSources(res), medical);
         })
         .catch(function (e) {
           state.busy = false;
@@ -5827,6 +5838,7 @@ body[data-view="ask"] #app{height:100dvh}
       setTimeout(function () {
         state.busy = false;
         holder.remove();
+        remember('assistant', plainOf(local));
         addBot(local.paras, local.sources, local.medical);
       }, 420);
       return;
@@ -5842,18 +5854,21 @@ body[data-view="ask"] #app{height:100dvh}
       state.busy = false;
       holder.remove();
       if (unsafe) {
+        remember('assistant', plainOf(local));
         addBot(local.paras, local.sources, local.medical);
         return;
       }
       var paras = answerText.split(/\n{2,}/).filter(function (x) { return x.trim(); }).map(function (block) {
         return P(esc(block).replace(/\n/g, '<br>'), block);
       });
+      remember('assistant', answerText);
       addBot(paras, local.sources, local.medical, '千问');
     }).catch(function (e) {
       state.busy = false;
       holder.remove();
       var r = answer(q);
       r.paras.push(P('（千问暂时没接通，这条用本机规则答：' + esc(e.message) + '）'));
+      remember('assistant', plainOf(r));
       addBot(r.paras, r.sources, r.medical);
     });
   }
@@ -6303,6 +6318,14 @@ body[data-view="ask"] #app{height:100dvh}
       '<div class="msg__body">' + esc(text) + '</div>';
     $('#thread').appendChild(el);
     scrollThread();
+  }
+
+  /* 闲聊层只拿这 10 轮消解指代；事实永远以服务端检索为准 */
+  function remember(role, text) {
+    var t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    if (!t) return;
+    state.chatLog.push({ role: role, content: t });
+    if (state.chatLog.length > 20) state.chatLog = state.chatLog.slice(-20);
   }
 
   function addBot(paras, sources, medical, engine) {

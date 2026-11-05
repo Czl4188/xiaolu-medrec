@@ -7,6 +7,7 @@
 import asyncio
 import json
 import logging
+import re
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,9 +15,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.agent import answer as answer_agent
+from app.agent import chat_free as chat_free_agent
 from app.agent import engine
 from app.agent import normalize as normalize_agent
+from app.agent import smalltalk_route
 from app.api.deps import current_user, rate_limit
+from app.core.config import settings
 from app.db import repo
 from app.db.models import User
 from app.db.session import get_db
@@ -61,6 +65,19 @@ OUT_OF_SCOPE_ANSWER = (
 
 SMALLTALK_ANSWER = "我在。想问档案里的哪件事？比如「上次开了什么药」「什么时候复诊」。"
 
+# 情绪危机：比普通急症更靠前，话术单独一套（不接档案入口、不问细节）
+CRISIS_ANSWER = (
+    "这句话我认真对待。\n\n"
+    "请现在拨打 12356（心理援助热线）或 120，也可以立刻找一个身边的人陪着你。"
+)
+
+# 只有症状、没有具体对象：不判断、不猜原因，给就医边界 + 档案入口
+SYMPTOM_ANSWER = (
+    "这种不舒服我不做判断，也不替你猜原因。\n\n"
+    "如果一直不缓解、越来越重，或者出现胸痛、呼吸困难、意识不清，尽快去医院或拨 120。\n\n"
+    "要不要我先翻出医生上次交代的注意事项？"
+)
+
 
 def _recent_lines(records) -> str:
     rows = list(records)[:3]
@@ -76,20 +93,46 @@ def _recent_lines(records) -> str:
     )
 
 
-def _route_only(cond: dict | None, records) -> dict | None:
-    """闲聊 / 求建议 / 急症 / 说不清：不检索、不调 chat，固定话术。"""
+def _route_only(cond: dict | None, records, question: str = "") -> dict | None:
+    """不检索的分支：危机 / 急症 / 越界 / 闲聊 / 说不清。
+
+    顺序固定：危机 → 急症 → 越界 → 闲聊 → 澄清。
+    急症与危机先于一切，任何情况下都不会被闲聊层接走。
+    """
+    if question and smalltalk_route.is_crisis(question):
+        return {"answer": CRISIS_ANSWER, "citations": [], "refused": False, "mode": "crisis"}
+
+    vocab = smalltalk_route.vocab_of(records)
+
     if not cond:
+        # 只有症状、没有可检索对象：规则检索只会回「未查询到」，这里直说边界
+        if question and smalltalk_route.symptom_only(question, vocab):
+            return {"answer": SYMPTOM_ANSWER, "citations": [], "refused": True, "mode": "symptom"}
+        # 归一失败/超时：用正则兜一层，避免「我爱你」掉进「未查询到」
+        if (question and settings.llm_smalltalk
+                and smalltalk_route.is_smalltalk(question, vocab)):
+            return {"answer": SMALLTALK_ANSWER, "citations": [], "refused": False,
+                    "mode": "smalltalk"}
         return None
+
     intent = cond.get("intent")
     if intent == "emergency":
-        return {"answer": EMERGENCY_ANSWER, "citations": [], "refused": True}
+        return {"answer": EMERGENCY_ANSWER, "citations": [], "refused": True, "mode": "emergency"}
     if intent == "out_of_scope":
-        return {"answer": OUT_OF_SCOPE_ANSWER, "citations": [], "refused": True}
+        return {"answer": OUT_OF_SCOPE_ANSWER, "citations": [], "refused": True,
+                "mode": "out_of_scope"}
+    if question and smalltalk_route.symptom_only(question, vocab):
+        return {"answer": SYMPTOM_ANSWER, "citations": [], "refused": True, "mode": "symptom"}
     if intent == "smalltalk":
-        return {"answer": SMALLTALK_ANSWER, "citations": [], "refused": False}
+        # 模型说是闲聊，但句子里有症状词/档案实体：不接，交给规则分支
+        if (question and not smalltalk_route.is_smalltalk(
+                question, vocab)):
+            return None
+        return {"answer": SMALLTALK_ANSWER, "citations": [], "refused": False, "mode": "smalltalk"}
     if intent == "unclear":
         tip = cond.get("need_clarify") or "你是想问哪一次？"
-        return {"answer": f"{tip}\n\n{_recent_lines(records)}", "citations": [], "refused": True}
+        return {"answer": f"{tip}\n\n{_recent_lines(records)}", "citations": [],
+                "refused": True, "mode": "clarify"}
     return None
 
 
@@ -134,9 +177,43 @@ def _facts_block(result: dict, records) -> str:
     return "\n".join(lines).strip()
 
 
+async def _smalltalk(question: str, result: dict, records, user_id: str,
+                     run_id: str, db: Session, history=None) -> str:
+    """闲聊层：模型说一句人话；不可用/越界/超时一律退回固定话术。"""
+    fallback = result["answer"]
+    if not settings.llm_smalltalk:
+        return fallback
+
+    started = time.monotonic()
+    turns = list(history or [])
+    text = await chat_free_agent.chat_free(question, turns, user_id, records, run_id)
+    ms = int((time.monotonic() - started) * 1000)
+    if text:
+        repo.add_tool_call(db, run_id, "chat_free", {"history": len(turns)},
+                           {"chars": len(text)}, duration_ms=ms)
+        return text
+
+    repo.add_tool_call(db, run_id, "chat_free", {"history": len(turns)},
+                       {"fallback": True}, error="对话层未返回可用结果", duration_ms=ms)
+    return fallback
+
+
+def _echo(text: str, question: str) -> bool:
+    """模型把问题原样复述一遍：这不是答案。"""
+    def flat(value: str) -> str:
+        return re.sub(r"[\s，。？！、,.?!~]+", "", value or "")
+
+    body = flat(text)
+    return bool(body) and body == flat(question)
+
+
 async def _compose(question: str, result: dict, records, user_id: str,
-                   run_id: str, db: Session, cond: dict | None = None) -> str:
+                   run_id: str, db: Session, cond: dict | None = None,
+                   history=None) -> str:
     """理解引擎 TASK=answer 作答；拒答/无来源不调模型，失败立刻退回规则答案。"""
+    if result.get("mode") == "smalltalk":
+        return await _smalltalk(question, result, records, user_id, run_id, db, history)
+
     if result.get("refused") or not result.get("citations"):
         return result["answer"]
 
@@ -144,6 +221,9 @@ async def _compose(question: str, result: dict, records, user_id: str,
     started = time.monotonic()
     text = await engine.answer(question, facts, user_id, run_id,
                                intent=(cond or {}).get("intent", ""))
+    if text and _echo(text, question):
+        logger.warning("engine answer 只复述了问题，退回规则答案：%s", question[:40])
+        text = ""
     if text:
         # 模型答案与规则答案的引用是否一致：不一致只记日志，不阻断
         if "[R" not in text:
@@ -166,7 +246,7 @@ async def _prepare(db: Session, user: User, body: ChatIn):
     vocab = normalize_agent.build_vocab(records)
     cond = await normalize_agent.normalize(body.question, user.id, vocab)
 
-    routed = _route_only(cond, records)
+    routed = _route_only(cond, records, body.question)
     if routed is not None:
         result = routed
     else:
@@ -182,6 +262,8 @@ async def _prepare(db: Session, user: User, body: ChatIn):
         "confidence": (cond or {}).get("confidence", 0),
         "normalize_fallback": cond is None,
         "routed": routed is not None,
+        "mode": (routed or {}).get("mode", ""),
+        "turns": len(body.history or []),
     })
     return run, result, records, cond
 
@@ -193,13 +275,15 @@ async def chat_sync(
     db: Session = Depends(get_db),
 ) -> AnswerOut:
     run, result, records, cond = await _prepare(db, user, body)
-    text = await _compose(body.question, result, records, user.id, run.id, db, cond)
+    text = await _compose(body.question, result, records, user.id, run.id, db, cond,
+                          [t.model_dump() for t in body.history])
     repo.add_step(db, run.id, 2, "compose_answer", detail={"refused": result["refused"]})
     repo.finish_run(db, run.id, "ok", {"answer": text, "refused": result["refused"]})
     return AnswerOut(
         answer=text,
         citations=result["citations"],
         refused=result["refused"],
+        kind=result.get("mode", ""),
     )
 
 
@@ -227,9 +311,11 @@ async def chat_stream(
                 for c in result["citations"]
             ],
             "refused": result["refused"],
+            "kind": result.get("mode", ""),
         })
 
-        text = await _compose(body.question, result, records, user.id, run.id, db, cond)
+        text = await _compose(body.question, result, records, user.id, run.id, db, cond,
+                              [t.model_dump() for t in body.history])
 
         # 注意：这是「按句切片推送」，不是 token 级流式。
         # 换真流式只需把这里换成读取模型 SSE；传输格式不用变。
@@ -249,6 +335,7 @@ async def chat_stream(
         yield sse("done", {
             "run_id": run.id,
             "refused": result["refused"],
+            "kind": result.get("mode", ""),
             "answer": text,
             "disclaimer": answer_agent.DISCLAIMER,
         })

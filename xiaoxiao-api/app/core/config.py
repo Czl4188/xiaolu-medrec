@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     normalize_model: str = ""            # 留空跟随 engine_model
     normalize_timeout: float = 2.5
     normalize_min_confidence: float = 0.6
+    # 对话层（闲聊 / 常识 / 情绪）：0 = 关闭，行为回到固定话术（回滚开关）
+    llm_smalltalk: int = 1
+    smalltalk_timeout: float = 12.0
+    # 日期/「距今几天」按这个时区算，避免服务器在 UTC 时把「今天」答错一天
+    app_timezone: str = "Asia/Shanghai"
     llm_vision_model: str = "qwen3-vl-plus"   # 识图模型（兼容 OpenAI 多模态格式）
     llm_fallback_model: str = ""         # 主模型熔断后的备用模型
     llm_timeout_seconds: float = 25.0

@@ -104,6 +104,11 @@ def check_answer(text: str, facts: str) -> bool:
     """答案守门：不许给意见，不许出现 facts 里没有的剂量。"""
     if not text or len(text) < 4:
         return False
+    # 模型把别的任务的 JSON 契约当成答案输出（实测发生过）
+    head = text.lstrip()
+    if head.startswith("{") or '"intent"' in text or '"confidence"' in text:
+        logger.warning("答案像 JSON 契约，丢弃：%s", text[:40])
+        return False
     if OUT_OF_SCOPE.search(text):
         return False
     if REMAIN.search(text) and not REMAIN.search(facts):
