@@ -5814,8 +5814,8 @@ body[data-view="ask"] #app{height:100dvh}
           holder.remove();
           remember('assistant', res.answer);
           var kind = res.kind || '';
-          /* 闲聊与危机话术不该挂「病历整理」的免责声明 */
-          var medical = (kind === 'smalltalk' || kind === 'crisis')
+          /* 闲聊、简单问答与危机话术不该挂「病历整理」的免责声明 */
+          var medical = (kind === 'smalltalk' || kind === 'free' || kind === 'crisis')
             ? false : (!res.refused || /120|急诊/.test(res.answer));
           addBot(buildCloudParas(res), buildCloudSources(res), medical);
         })

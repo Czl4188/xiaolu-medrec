@@ -119,6 +119,10 @@ def _route_only(cond: dict | None, records, question: str = "") -> dict | None:
     if intent == "emergency":
         return {"answer": EMERGENCY_ANSWER, "citations": [], "refused": True, "mode": "emergency"}
     if intent == "out_of_scope":
+        # 简单、不涉及医学建议的问题先让对话层答，答不了再回到固定话术
+        if question and smalltalk_route.simple_answerable(question):
+            return {"answer": OUT_OF_SCOPE_ANSWER, "citations": [], "refused": False,
+                    "mode": "free"}
         return {"answer": OUT_OF_SCOPE_ANSWER, "citations": [], "refused": True,
                 "mode": "out_of_scope"}
     if question and smalltalk_route.symptom_only(question, vocab):
@@ -189,6 +193,7 @@ async def _smalltalk(question: str, result: dict, records, user_id: str,
     text = await chat_free_agent.chat_free(question, turns, user_id, records, run_id)
     ms = int((time.monotonic() - started) * 1000)
     if text:
+        text = _tidy(text)
         repo.add_tool_call(db, run_id, "chat_free", {"history": len(turns)},
                            {"chars": len(text)}, duration_ms=ms)
         return text
@@ -196,6 +201,18 @@ async def _smalltalk(question: str, result: dict, records, user_id: str,
     repo.add_tool_call(db, run_id, "chat_free", {"history": len(turns)},
                        {"fallback": True}, error="对话层未返回可用结果", duration_ms=ms)
     return fallback
+
+
+def _tidy(text: str) -> str:
+    """收拾模型输出的小毛病：缺问号的补上，多余空行压掉。"""
+    out = str(text or "").strip()
+    out = re.sub(r"[ \t]+\n", "\n", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    if out and out[-1] in "吗呢吧么":
+        out += "？"
+    elif out and out[-1] not in "。！？…~!?.":
+        out += "。"
+    return out
 
 
 def _echo(text: str, question: str) -> bool:
@@ -211,10 +228,14 @@ async def _compose(question: str, result: dict, records, user_id: str,
                    run_id: str, db: Session, cond: dict | None = None,
                    history=None) -> str:
     """理解引擎 TASK=answer 作答；拒答/无来源不调模型，失败立刻退回规则答案。"""
-    if result.get("mode") == "smalltalk":
+    if result.get("mode") in ("smalltalk", "free"):
         return await _smalltalk(question, result, records, user_id, run_id, db, history)
 
     if result.get("refused") or not result.get("citations"):
+        return result["answer"]
+
+    # 时间题必须逐字准确：不走模型改写
+    if answer_agent.CLOCK.search(question):
         return result["answer"]
 
     facts = _facts_block(result, records)
@@ -225,6 +246,7 @@ async def _compose(question: str, result: dict, records, user_id: str,
         logger.warning("engine answer 只复述了问题，退回规则答案：%s", question[:40])
         text = ""
     if text:
+        text = _tidy(text)
         # 模型答案与规则答案的引用是否一致：不一致只记日志，不阻断
         if "[R" not in text:
             logger.warning("engine answer 缺少 [R] 引用，记录 divergence：%s", question[:40])

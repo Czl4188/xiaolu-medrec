@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import re
 from pathlib import Path
 
@@ -35,6 +36,8 @@ OUT_OF_SCOPE = re.compile(
     r"可能是|应该是|考虑是|一般需要|通常|大概率|问题不大|不用担心|建议服用|建议停药"
 )
 UNIT_TOKEN = re.compile(r"\d+(?:\.\d+)?\s*(?:mg|g|ml|片|粒|袋|支|单位)", re.I)
+# 天数 / 次数 / 周期：措辞可以自由，数字必须有依据
+DAY_TOKEN = re.compile(r"\d+\s*(?:天|日|周|星期|次|个月)")
 # 「共 14 天」不等于「还剩 14 天」：没有原文依据的剩余量属于推断
 REMAIN = re.compile(r"还剩|剩余|还能吃")
 # 疗程必须有「吃/服/用 + 数字 + 天/周」的原话；「两周后复诊」不算疗程
@@ -43,6 +46,15 @@ DAYS_OK = re.compile(r"(?:吃|服|用|连服|共|吃满)\s*(?:\d+|[一二三四�
 _ALLOWED_TIMING = {"饭前", "饭后", "随餐", "空腹", "睡前", "早上", "晚上", "必要时"}
 _ALLOWED_STATUS = {"positive", "denied", "unknown", "family"}
 _ALLOWED_KIND = {"drug", "food", "other"}
+
+# 只改说法，不改事实：每次随机挑一种写法，避免所有回答一个模子
+ANSWER_STYLES = (
+    "开头用「查到了，是…那次：」这样的引出句，冒号后直接给内容。",
+    "开头直接给结论，不要引子。",
+    "开头用「记录里写的是…」。",
+    "只有一两条结果时，用短句连起来说，不用列表符号；但药名、剂量、用法一个都不能少。",
+    "先用一句话把最关键的说完，再用列表补细节。",
+)
 
 
 def compact(text: str) -> str:
@@ -116,6 +128,10 @@ def check_answer(text: str, facts: str) -> bool:
         return False
     for token in UNIT_TOKEN.findall(text):
         if compact(token) not in compact(facts):
+            return False
+    for token in DAY_TOKEN.findall(text):
+        if compact(token) not in compact(facts):
+            logger.warning("答案出现无依据的天数/次数，丢弃：%s", token)
             return False
     return True
 
@@ -274,12 +290,15 @@ async def answer(question: str, facts: str, user_id: str, run_id: str | None = N
         return None
     messages = [
         {"role": "system", "content": system_for("answer")},
-        {"role": "user", "content": f"【意图】{intent or '未提供'}\n\n【问题】{question}\n\n【档案】\n{facts}"},
+        {"role": "user", "content": (
+            f"【意图】{intent or '未提供'}\n\n【问题】{question}\n\n"
+            f"【写法】{random.choice(ANSWER_STYLES)}\n\n【档案】\n{facts}"
+        )},
     ]
     try:
         text = await llm.complete(
             messages, user_id=user_id, run_id=run_id,
-            temperature=0, max_tokens=900, timeout=45,
+            temperature=settings.answer_temperature, max_tokens=900, timeout=45,
             model=settings.engine_model,
         )
     except llm.LLMError as exc:
