@@ -240,9 +240,17 @@ class ExtractOut(BaseModel):
 
 
 # ————————————————— 对话 —————————————————
+class ChatTurn(BaseModel):
+    """前端带上来的历史轮次：只用于消解指代，不作为事实来源。"""
+
+    role: str = Field(default="user", max_length=16)
+    content: str = Field(default="", max_length=200)
+
+
 class ChatIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     idempotency_key: str = Field(default="", max_length=80)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=40)
 
 
 class Citation(BaseModel):
@@ -256,6 +264,8 @@ class AnswerOut(BaseModel):
     answer: str
     citations: list[Citation] = []
     refused: bool = False
+    # smalltalk / crisis / emergency / out_of_scope / clarify；空串 = 档案作答
+    kind: str = ""
     disclaimer: str = "本内容仅为病历档案整理，不能替代医生诊疗意见。"
 
 
