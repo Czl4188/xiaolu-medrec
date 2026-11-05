@@ -6446,7 +6446,7 @@ body[data-view="ask"] #app{height:100dvh}
      只在本机提醒（页内横幅 / 系统通知 / 导出到手机日历），
      不判断该不该吃，打卡记录也不上传服务端。
      ============================================================ */
-  var RM = { on: false, log: {}, timer: 0, fired: {}, bound: false };
+  var RM = { on: false, log: {}, timer: 0, fired: {}, snooze: {}, bound: false };
   var RM_FALLBACK_DAYS = 7;   // 既没写复诊日、也没写疗程时，先提醒一周
   var RM_SLOTS = {
     1: ['08:00'],
@@ -6487,6 +6487,9 @@ body[data-view="ask"] #app{height:100dvh}
   /* 频次 → 每天几次：「每日三次」「一天两次」「每晚」都认，认不出按一次 */
   function rmPerDay(med) {
     var freq = clean(med && med.freq);
+    var timing = clean(med && med.timing);
+    /* 按需/必要时不排定时提醒，免得一天几次乱响 */
+    if (/按需|必要时|需要时|临时|喘时/.test(freq) || /按需|必要时|需要时|临时|喘时/.test(timing)) return 0;
     if (/每晚|每夜/.test(freq)) return 1;
     var m = freq.match(/([一二两三四1-4])\s*次/);
     if (m) {
@@ -6507,13 +6510,15 @@ body[data-view="ask"] #app{height:100dvh}
   function rmTimesFor(med) {
     var timing = clean(med && med.timing);
     var freq = clean(med && med.freq);
+    var per = rmPerDay(med);
+    if (!per) return [];
     var slots;
     if (/睡前|每晚|每夜/.test(timing) || /每晚|每夜/.test(freq)) {
       slots = ['21:30'];
     } else if (/每早|晨起|清晨/.test(timing)) {
       slots = ['07:00'];
     } else {
-      slots = RM_SLOTS[rmPerDay(med)].slice();
+      slots = RM_SLOTS[per].slice();
       if (/空腹/.test(timing)) slots = slots.map(function (t) { return rmShift(t, -60); });
     }
     if (/饭后|餐后/.test(timing)) slots = slots.map(function (t) { return rmShift(t, 30); });
@@ -6650,13 +6655,16 @@ body[data-view="ask"] #app{height:100dvh}
       while (el && el !== bar && !el.getAttribute('data-rm')) el = el.parentNode;
       var act = el && el !== bar ? el.getAttribute('data-rm') : '';
       if (!act) return;
+      var keys = String(bar.getAttribute('data-keys') || '').split('||').filter(Boolean);
+      var sig = rmDayKey() + '|' + (keys[0] || '');
       if (act === 'ok') {
-        var keys = String(bar.getAttribute('data-keys') || '').split('||').filter(Boolean);
         keys.forEach(function (k) { rmSetTaken(rmDayKey(), k, true); });
+        delete RM.snooze[sig];
         toast('这一顿今天不再提醒。');
         renderRemind();
       } else {
-        toast('稍后再提醒你。');
+        RM.snooze[sig] = Date.now() + 10 * 60 * 1000;   // 10 分钟后再提醒
+        toast('10 分钟后再提醒你。');
       }
       bar.hidden = true;
     });
@@ -6687,8 +6695,9 @@ body[data-view="ask"] #app{height:100dvh}
     });
     if (!due.length) return;
     var sig = day + '|' + due[0].key;
-    if (RM.fired[sig]) return;      // 同一顿只提醒一次，别每分钟弹一遍
+    if (RM.fired[sig] && !(RM.snooze[sig] && Date.now() >= RM.snooze[sig])) return;
     RM.fired[sig] = 1;
+    delete RM.snooze[sig];
     rmShowBar(plan, due);
     rmNotify(plan, due);
   }
