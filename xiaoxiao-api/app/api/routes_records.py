@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from datetime import UTC, datetime
+
+from app.agent import engine
 from app.agent.extractor import extract
 from app.agent.refine import refine_extract
 from app.api.deps import current_user, rate_limit
@@ -27,6 +30,11 @@ def _to_out(record: Record) -> RecordOut:
         conditions=record.conditions or [],
         discontinued=record.discontinued or [],
         allergy_denied=bool(record.allergy_denied),
+        allergens=record.allergens or [],
+        reading=record.reading or "",
+        self_check=record.self_check or [],
+        confidence=float(record.confidence or 0),
+        uncertain=record.uncertain or [],
         mode=record.mode,
         created_at=record.created_at,
     )
@@ -98,14 +106,82 @@ def delete_record(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "记录不存在")
 
 
+def _engine_visit(engine_result: dict, rule: dict) -> tuple[datetime, datetime | None]:
+    """理解引擎只认明确日期；认出来就用，否则沿用规则结果。"""
+    raw = str(engine_result.get("visit_date") or "").strip()
+    if raw:
+        try:
+            day = datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            day = None
+        if day is not None:
+            tz = datetime.now(UTC).astimezone().tzinfo
+            picked = day.replace(hour=9, minute=0, tzinfo=tz)
+            return picked, picked
+    return rule.get("visit_at") or datetime.now(UTC), rule.get("visit_hint")
+
+
+def _merge_engine(rule: dict, eng: dict) -> dict:
+    """模型抽到的字段优先；空字段回填规则值，保证「宁可少抽」不等于「全都丢」。"""
+    out = dict(rule)
+    for key in ("hospital", "summary", "follow_up", "notes", "conditions",
+                "discontinued", "holes"):
+        value = eng.get(key)
+        if value:
+            out[key] = value
+    if not eng.get("meds"):
+        out["meds"] = rule.get("meds") or []
+    else:
+        out["meds"] = eng["meds"]
+
+    # 过敏：模型明确表态（阳性/否认）时以模型为准，完全没提才用规则结果
+    if eng.get("allergens"):
+        out["allergy"] = eng.get("allergy", "")
+        out["allergy_denied"] = bool(eng.get("allergy_denied"))
+    out["allergens"] = eng.get("allergens") or []
+
+    out["visit_at"], out["visit_hint"] = _engine_visit(eng, rule)
+    out["reading"] = eng.get("reading", "")
+    out["self_check"] = eng.get("self_check") or []
+    out["confidence"] = eng.get("confidence") or 0.0
+    out["uncertain"] = []
+
+    # 合并后重算 holes，避免模型按自己的空值报缺、而规则其实抽到了
+    holes = []
+    if not out.get("hospital"):
+        holes.append("医院")
+    if not out.get("summary"):
+        holes.append("诊断")
+    if not out.get("meds"):
+        holes.append("用药")
+    if not out.get("follow_up"):
+        holes.append("复诊")
+    out["holes"] = holes
+    return out
+
+
 @router.post("/extract", response_model=ExtractOut,
              dependencies=[Depends(rate_limit("records:extract", 60))])
 async def extract_fields(body: ExtractIn, user: User = Depends(current_user)) -> ExtractOut:
     """把一段转写抽成结构化字段。不落库——用户确认后才 POST /api/records。
 
-    规则先抽一遍（谁、哪几个药），再让模型校对药名与用法；
-    模型输出必须能在原文里找到依据，找不到就保留规则值。
+    链路：规则先兜底（保证永远有结果）→ 理解引擎 TASK=summarize
+    （先 reading 数药、再抽 record、最后 self_check）→ 合并。
+    模型失败、JSON 不合法、药名没过守门，都退回规则 + 药名校对。
     """
-    result = extract(body.text)
-    result = await refine_extract(body.text, result, user.id)
+    rule = extract(body.text)
+    eng = await engine.summarize(body.text, user.id) if engine.is_ready() else None
+
+    useful = bool(eng) and any(eng.get(k) for k in ("meds", "hospital", "summary", "follow_up"))
+    if useful:
+        result = _merge_engine(rule, eng)
+        result["source"] = "engine"
+    else:
+        result = await refine_extract(body.text, rule, user.id)
+        result["source"] = "rule"
+        result.setdefault("allergens", [])
+        result.setdefault("reading", "")
+        result.setdefault("self_check", [])
+        result.setdefault("confidence", 0.0)
+        result.setdefault("uncertain", [])
     return ExtractOut(**result)

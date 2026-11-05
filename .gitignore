@@ -38,3 +38,9 @@ Thumbs.db
 # ————— 临时测试探针 —————
 xiaoxiao-ai/_*.html
 xiaoxiao-api/web/_*.html
+
+# 微信开发者工具的个人本地配置
+xiaolu-miniprogram/project.private.config.json
+
+# 含测试账号与访问码，只留本机
+小鹿项目-迁移说明.md

@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.agent import answer as answer_agent
-from app.agent import llm
+from app.agent import engine
 from app.api.deps import current_user, rate_limit
 from app.db import repo
 from app.db.models import User
@@ -23,18 +23,6 @@ from app.schemas import AnswerOut, ChatIn
 
 logger = logging.getLogger("app.chat")
 router = APIRouter(prefix="/api/chat", tags=["chat"])
-
-SYSTEM_PROMPT = (
-    "你是「小鹿」，一个病历记录整理助手。规则：\n"
-    "1. 只能使用给你的【事实】作答，不得补充事实之外的任何医学信息；\n"
-    "2. 不得给出诊断、用药建议、剂量调整或停药意见；用户问这类问题时，说明超出范围并建议问医生；\n"
-    "3. 不得改变【事实】里的日期、药名、剂量、疗程；\n"
-    "4. 保持简体中文，语气克制，不要寒暄，不要用「作为AI」这类话；\n"
-    "5. 只输出正文，不要输出 markdown 标题；\n"
-    "6. 如果【问题】问的正是【事实】里记录过的内容（同一次就诊、同一个药、同一个复诊安排），"
-    "就直接复述记录里的原文信息（日期、医院、诊断、药名、用法、复诊、注意事项），不要回答「没有记录」；\n"
-    "7. 复述时保留原记录里的数字与单位，不要换算、不要补全记录里没有的剂量。"
-)
 
 
 def _records_payload(records) -> list[dict]:
@@ -58,28 +46,69 @@ def _records_payload(records) -> list[dict]:
     ]
 
 
-async def _polish(question: str, facts: str, user_id: str, run_id: str, db: Session) -> str:
-    """让模型把事实说顺；失败就用原答案，绝不因为模型挂了而答不出来。"""
-    if not llm.is_configured():
-        return facts
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"【事实】\n{facts}\n\n【问题】\n{question}"},
-    ]
+def _facts_block(result: dict, records) -> str:
+    """把规则命中的记录折成带 [R1] 标号的事实块，交给 TASK=answer。
+
+    只给命中记录，不给全部档案 —— 模型最常见的错就是拿别的记录凑答案。
+    """
+    by_id = {r.id: r for r in records}
+    chosen = [by_id[c["record_id"]] for c in result.get("citations") or []
+              if c.get("record_id") in by_id]
+    if not chosen:
+        chosen = list(records)[:2]
+
+    lines: list[str] = []
+    for i, r in enumerate(chosen[:4], 1):
+        day = answer_agent.fmt_date(r.visit_at)
+        lines.append(f"[R{i}] {day} {r.hospital or '未记录医院'}")
+        lines.append(f"诊断：{r.summary or '未写明'}")
+        meds = r.meds or []
+        if meds:
+            bits = []
+            for m in meds:
+                parts = [m.get("name", "")]
+                for key in ("dose", "freq", "timing"):
+                    if m.get(key):
+                        parts.append(m[key])
+                if m.get("days"):
+                    parts.append(f"{m['days']} 天")
+                bits.append("·".join(p for p in parts if p))
+            lines.append("用药：" + "；".join(bits))
+        if r.follow_up:
+            lines.append(f"复诊：{r.follow_up}")
+        if r.allergy:
+            lines.append(f"过敏：{r.allergy}")
+        elif r.allergy_denied:
+            lines.append("过敏：记录写「未发现过敏」")
+        notes = r.notes or []
+        if notes:
+            lines.append("注意事项：" + "；".join(notes))
+        lines.append("")
+    return "\n".join(lines).strip()
+
+
+async def _compose(question: str, result: dict, records, user_id: str,
+                   run_id: str, db: Session) -> str:
+    """理解引擎 TASK=answer 作答；拒答/无来源不调模型，失败立刻退回规则答案。"""
+    if result.get("refused") or not result.get("citations"):
+        return result["answer"]
+
+    facts = _facts_block(result, records)
     started = time.monotonic()
-    try:
-        polished = await llm.complete(messages, user_id=user_id, run_id=run_id)
-        repo.add_tool_call(db, run_id, "llm.complete",
-                           {"model": "primary", "chars": len(facts)},
-                           {"chars": len(polished)},
+    text = await engine.answer(question, facts, user_id, run_id)
+    if text:
+        # 模型答案与规则答案的引用是否一致：不一致只记日志，不阻断
+        if "[R" not in text:
+            logger.warning("engine answer 缺少 [R] 引用，记录 divergence：%s", question[:40])
+        repo.add_tool_call(db, run_id, "engine.answer",
+                           {"chars": len(facts)}, {"chars": len(text)},
                            duration_ms=int((time.monotonic() - started) * 1000))
-        return polished or facts
-    except llm.LLMError as exc:
-        logger.warning("模型不可用，回退规则答案: %s", exc)
-        repo.add_tool_call(db, run_id, "llm.complete", {"model": "primary"},
-                           {}, error=str(exc)[:300],
-                           duration_ms=int((time.monotonic() - started) * 1000))
-        return facts
+        return text
+
+    repo.add_tool_call(db, run_id, "engine.answer", {"chars": len(facts)},
+                       {"fallback": True}, error="engine 未返回可用的答案",
+                       duration_ms=int((time.monotonic() - started) * 1000))
+    return result["answer"]
 
 
 def _prepare(db: Session, user: User, body: ChatIn):
@@ -99,8 +128,8 @@ async def chat_sync(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> AnswerOut:
-    run, result, _ = _prepare(db, user, body)
-    text = await _polish(body.question, result["answer"], user.id, run.id, db)
+    run, result, records = _prepare(db, user, body)
+    text = await _compose(body.question, result, records, user.id, run.id, db)
     repo.add_step(db, run.id, 2, "compose_answer", detail={"refused": result["refused"]})
     repo.finish_run(db, run.id, "ok", {"answer": text, "refused": result["refused"]})
     return AnswerOut(
@@ -116,7 +145,7 @@ async def chat_stream(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    run, result, _ = _prepare(db, user, body)
+    run, result, records = _prepare(db, user, body)
 
     async def events():
         def sse(event: str, data: dict) -> str:
@@ -136,7 +165,7 @@ async def chat_stream(
             "refused": result["refused"],
         })
 
-        text = await _polish(body.question, result["answer"], user.id, run.id, db)
+        text = await _compose(body.question, result, records, user.id, run.id, db)
 
         # 注意：这是「按句切片推送」，不是 token 级流式。
         # 换真流式只需把这里换成读取模型 SSE；传输格式不用变。

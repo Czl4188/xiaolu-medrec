@@ -23,6 +23,12 @@ _COLUMNS = (
     ("profiles", "idcard_enc", "TEXT DEFAULT ''"),
     ("users", "phone_hash", "TEXT"),
     ("users", "phone_enc", "TEXT DEFAULT ''"),
+    # v2：理解引擎的留痕字段
+    ("records", "allergens", "JSON"),
+    ("records", "reading", "TEXT DEFAULT ''"),
+    ("records", "self_check", "JSON"),
+    ("records", "confidence", "REAL DEFAULT 0"),
+    ("records", "uncertain", "JSON"),
 )
 
 # 手机号摘要的唯一索引，与 create_all 生成的名字保持一致
