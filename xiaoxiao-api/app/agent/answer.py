@@ -9,8 +9,11 @@
 模型只负责把结论说顺，不参与「答什么」。
 """
 
+import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+
+logger = logging.getLogger("app.answer")
 
 DISCLAIMER = "本内容仅为病历档案整理，不能替代医生诊疗意见。"
 
@@ -127,7 +130,87 @@ def _missing_clinical(question: str, records: list[dict]) -> list[str]:
     return sorted(m for m in mentioned if m not in blob)
 
 
-# ————————————————— 结构化条件 —————————————————
+# ————————————————— 归一条件（cond） —————————————————
+def _record_blob(r: dict) -> str:
+    return " ".join([
+        str(r.get("hospital") or ""), str(r.get("summary") or ""),
+        str(r.get("transcript") or ""), str(r.get("allergy") or ""),
+        " ".join(str(x) for x in (r.get("conditions") or [])),
+        " ".join(str(x) for x in (r.get("notes") or [])),
+        " ".join(str(m.get("name") or "") for m in (r.get("meds") or []) if isinstance(m, dict)),
+    ])
+
+
+def _filter_by_cond(records: list[dict], cond: dict | None) -> tuple[list[dict], bool]:
+    """按归一条件筛记录；返回 (记录, 是否显式筛过)。cond=None 时原样返回。"""
+    recs = _sorted(records)
+    if not cond:
+        return recs, False
+
+    explicit = False
+    hospital = cond.get("hospital")
+    if hospital:
+        recs = [r for r in recs if _hosp_match(r.get("hospital", ""), hospital)]
+        explicit = True
+
+    scope = cond.get("time_scope") or {}
+    kind = scope.get("type")
+    if kind == "nth":
+        nth = int(scope.get("nth") or 1)
+        recs = recs[max(0, nth - 1):]
+        explicit = True
+    elif kind == "range":
+        try:
+            start = date.fromisoformat(scope["from"])
+            end = date.fromisoformat(scope["to"])
+        except (KeyError, TypeError, ValueError):
+            start = end = None
+        if start and end:
+            recs = [r for r in recs if start <= r["visit_at"].date() <= end]
+            explicit = True
+
+    keywords = [k for k in (cond.get("keywords") or []) if k]
+    if keywords:
+        hit = [r for r in recs if any(k in _record_blob(r) for k in keywords)]
+        if hit:
+            recs = hit
+            explicit = True
+        else:
+            # 「降压药」这类类别词在档案里没有原词，硬过滤会把能答的问题变成查不到。
+            # 关键词只是缩小范围，不能单独决定有没有；没命中就退回未按词过滤的结果。
+            logger.info("关键词未命中档案，退回范围过滤：%s", keywords)
+
+    return recs, explicit
+
+
+def _cond_no_match(cond: dict, records: list[dict]) -> dict:
+    bits = []
+    hospital = cond.get("hospital")
+    if hospital:
+        bits.append(f"医院 {hospital}")
+    keywords = cond.get("keywords") or []
+    if keywords:
+        bits.append("关键词 " + "、".join(keywords))
+    scope = cond.get("time_scope") or {}
+    if scope.get("type") == "range":
+        bits.append(f"时间 {scope.get('from')} 至 {scope.get('to')}")
+    elif scope.get("type") == "nth":
+        bits.append(f"从最近往前第 {scope.get('nth')} 次")
+
+    label = "、".join(bits) or "这组条件"
+    available = "、".join(
+        f"{fmt_date(r['visit_at'])} {r.get('hospital') or '未记录医院'}" for r in _sorted(records)[:3]
+    )
+    return {
+        "answer": f"档案里没有符合「{label}」的记录。\n\n"
+                  + (f"现有记录：{available}。" if available else "你的档案里还没有记录。")
+                  + "\n\n可以换一个关键词，或直接问「我一共看过几次」看时间线。",
+        "citations": [],
+        "refused": True,
+    }
+
+
+
 def _cn_int(value: str) -> int | None:
     if value.isdigit():
         return int(value)
@@ -363,10 +446,13 @@ def _allergy_answer(records: list[dict]) -> dict:
     }
 
 
-def answer(question: str, records: list[dict]) -> dict:
+def answer(question: str, records: list[dict], cond: dict | None = None) -> dict:
     q = question.strip()
-    recs = _sorted(records)
+    recs, filtered = _filter_by_cond(records, cond)
+    if cond and filtered and not recs:
+        return _cond_no_match(cond, records)
     last = recs[0] if recs else None
+    intent = (cond or {}).get("intent", "")
 
     # —— 0. 急症：不查档案、不给建议，直接引导就医 ——
     if EMERGENCY.search(q):
@@ -449,7 +535,7 @@ def answer(question: str, records: list[dict]) -> dict:
         }
 
     # —— 7. 诊断 / 疾病 / 就诊原因 ——
-    if DIAGNOSIS_Q.search(q):
+    if DIAGNOSIS_Q.search(q) or intent == "diagnosis":
         target, matched, explicit = _select(q, recs)
         if explicit and not target:
             return _no_match(q, recs)
@@ -489,7 +575,7 @@ def answer(question: str, records: list[dict]) -> dict:
         return {"answer": "\n".join(lines), "citations": cites, "refused": False}
 
     # —— 8. 药单（先定位记录，再取该次用药）——
-    if MED_Q.search(q):
+    if MED_Q.search(q) or intent in ("medication", "trend"):
         target, matched, explicit, skipped = _select_meds(q, recs)
 
         # 8a. 「都用过什么药 / 一共开过哪些」：跨全部档案汇总，同名以最近一次为准
@@ -548,7 +634,7 @@ def answer(question: str, records: list[dict]) -> dict:
         return {"answer": "\n".join(lines), "citations": cites, "refused": False}
 
     # —— 9. 剂量 / 服法 / 疗程 ——
-    if DOSE_Q.search(q):
+    if DOSE_Q.search(q) or (intent == "medication" and cond.get("question_kind") == "value"):
         target, matched, explicit, skipped = _select_meds(q, recs)
 
         # 问题点名了某个药：去全部档案里找它最近的一次，而不是只看最近那份记录
@@ -583,7 +669,7 @@ def answer(question: str, records: list[dict]) -> dict:
         return {"answer": "\n".join(lines), "citations": [cite_of(target)], "refused": False}
 
     # —— 10. 复诊 ——
-    if FOLLOW_Q.search(q):
+    if FOLLOW_Q.search(q) or intent == "follow_up":
         target, matched, explicit = _select(q, recs)
         if explicit and not target:
             return _no_match(q, recs)
@@ -618,7 +704,7 @@ def answer(question: str, records: list[dict]) -> dict:
         return {"answer": "\n".join(lines), "citations": cites, "refused": False}
 
     # —— 11. 过敏（跨记录汇总）——
-    if ALLERGY_Q.search(q):
+    if ALLERGY_Q.search(q) or intent == "allergy":
         return _allergy_answer(recs)
 
     # —— 12. 注意事项 ——
@@ -695,7 +781,7 @@ def answer(question: str, records: list[dict]) -> dict:
 
     # —— 13. 次数 / 时间线 ——
     pool, explicit, label = _filter_pool(q, recs)
-    if COUNT_Q.search(q):
+    if COUNT_Q.search(q) or intent == "trend":
         if explicit and not pool:
             return _no_match(q, recs)
         shown = pool if explicit else recs
@@ -706,7 +792,7 @@ def answer(question: str, records: list[dict]) -> dict:
         return {"answer": "\n".join(lines),
                 "citations": [cite_of(r) for r in shown[:3]], "refused": False}
 
-    if LAST_Q.search(q):
+    if LAST_Q.search(q) or intent == "visit":
         if explicit and not pool:
             return _no_match(q, recs)
         target = pool[0] if explicit else last

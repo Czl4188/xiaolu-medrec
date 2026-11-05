@@ -308,7 +308,9 @@ Key 不进浏览器，换设备不用重填，也能统一限流和换模型。
 - 不做服药依从性记录：提醒只在本机（页内提示 / 系统通知 / 导出 .ics），
   勾掉「这一顿不再提醒」只是本地提醒状态，不上传、不参与问答，问答里仍答「没有服药记录」
 - 服务端不长期保存音频：转写时音频经 DashScope 临时存储（48 小时自动清理），只把转写文本写进档案
-- 理解引擎：`app/agent/engine.py` + `app/agent/prompts/lu_engine.txt`，三段共用一个 system 文本，按 `TASK` 切换；归纳与作答默认走 `ENGINE_MODEL`（默认 `qwen-flash`，失败回退 `LLM_MODEL`）
+- 理解引擎：`app/agent/engine.py` + `app/agent/prompts/lu_engine.txt`，四段共用一个 system 文本，按 `TASK` 切换（transcribe / summarize / route / answer）；归纳与作答默认走 `ENGINE_MODEL`（默认 `qwen-flash`，失败回退 `LLM_MODEL`）
+- 提问归一：`app/agent/normalize.py` 调 `TASK=route`，输出经 intent / time_scope / confidence 三项硬校验与词表校验；失败返回 None，`answer()` 按原句走，行为不变。归一结果只用于路由与过滤（医院、第几次、时间区间、关键词），不参与事实生成
+- 分诊：smalltalk / out_of_scope / emergency / unclear 四类在检索前短路，固定话术、不调作答模型
 - 模型输出不直接入库：药名带连接词、`evidence` 不在原文、疗程无「吃 X 天」原话、答案含越界词或数字不在 facts 里，都会在代码侧被丢弃并回退规则结果
 - 定位只用于一次性解析医院名：坐标不落库、不写日志；解析请求发往 OpenStreetMap 的 Photon 服务，不保存
 - 不把患者数据用于训练

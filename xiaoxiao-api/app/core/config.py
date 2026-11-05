@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek-chat"
     # 理解引擎（summarize / answer）默认用更快的小模型；留空则跟随 llm_model
     engine_model: str = "qwen-flash"
+    # 提问归一（TASK=route）：更轻的分类任务，超时就降级
+    normalize_model: str = ""            # 留空跟随 engine_model
+    normalize_timeout: float = 2.5
+    normalize_min_confidence: float = 0.6
     llm_vision_model: str = "qwen3-vl-plus"   # 识图模型（兼容 OpenAI 多模态格式）
     llm_fallback_model: str = ""         # 主模型熔断后的备用模型
     llm_timeout_seconds: float = 25.0

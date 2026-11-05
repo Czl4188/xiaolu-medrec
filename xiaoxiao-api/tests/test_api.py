@@ -1130,3 +1130,86 @@ def test_engine_drops_days_without_evidence():
                               "days": "14", "evidence": "氨氯地平吃 14 天"}],
                             "医生：氨氯地平吃 14 天，每天一次。")
     assert meds2[0]["days"] == "14"
+
+# ————————————————— 提问归一 —————————————————
+def _cond_records():
+    from datetime import datetime, timezone
+    return [
+        {"id": "r1", "client_id": "r1", "visit_at": datetime(2026, 11, 4, 9, tzinfo=timezone.utc),
+         "hospital": "市第一人民医院", "summary": "支气管哮喘",
+         "meds": [{"name": "布地奈德福莫特罗", "dose": "160μg", "freq": "每天两次"}],
+         "conditions": ["支气管哮喘"], "notes": [], "allergy": "", "transcript": ""},
+        {"id": "r2", "client_id": "r2", "visit_at": datetime(2026, 10, 20, 9, tzinfo=timezone.utc),
+         "hospital": "市第一人民医院", "summary": "慢性胃炎",
+         "meds": [{"name": "奥美拉唑", "dose": "20mg", "freq": "每天两次", "timing": "饭前"}],
+         "conditions": ["慢性胃炎"], "notes": ["少吃辣"], "allergy": "", "transcript": ""},
+    ]
+
+
+def test_normalize_validate_contract():
+    from app.agent.normalize import validate
+    vocab = {"meds": ["奥美拉唑"], "hospitals": ["市第一人民医院"],
+             "conditions": [], "timings": [], "freqs": []}
+    base = {"intent": "medication", "question_kind": "value",
+            "time_scope": {"type": "latest"}, "hospital": "市第一人民医院",
+            "keywords": ["奥美拉唑", "编造药"], "keywords_raw": [],
+            "need_clarify": None, "rewritten": "上次那个奥美拉唑还吃几天", "confidence": 0.82}
+    cond = validate(base, "上次那个奥美拉唑还吃几天", vocab)
+    assert cond and cond["intent"] == "medication"
+    assert cond["keywords"] == ["奥美拉唑"]
+    assert cond["hospital"] == "市第一人民医院"
+
+    assert validate({**base, "intent": "bogus"}, "x", vocab) is None
+    assert validate({**base, "confidence": 0.5}, "x", vocab) is None
+    assert validate({**base, "time_scope": {"type": "week"}}, "x", vocab) is None
+    assert validate({**base, "hospital": "协和医院"}, "x", vocab)["hospital"] is None
+
+
+def test_normalize_drops_invented_keywords():
+    from app.agent.normalize import validate
+    vocab = {"meds": [], "hospitals": [], "conditions": [], "timings": [], "freqs": []}
+    data = {"intent": "visit", "question_kind": "time", "time_scope": {"type": "all"},
+            "hospital": None, "keywords": ["头痛", "编造词"], "keywords_raw": [],
+            "need_clarify": None, "rewritten": "", "confidence": 0.9}
+    cond = validate(data, "我头痛是什么时候看的", vocab)
+    assert cond["keywords"] == ["头痛"]
+
+
+def test_answer_filters_by_cond():
+    from app.agent.answer import _filter_by_cond
+    recs = _cond_records()
+    got, explicit = _filter_by_cond(recs, {"time_scope": {"type": "nth", "nth": 2}})
+    assert explicit and len(got) == 1 and got[0]["summary"] == "慢性胃炎"
+    got, _ = _filter_by_cond(recs, {"keywords": ["奥美拉唑"]})
+    assert len(got) == 1 and got[0]["id"] == "r2"
+    got, _ = _filter_by_cond(recs, {"hospital": "不存在的医院"})
+    assert got == []
+
+
+def test_answer_no_match_message_for_cond():
+    from app.agent.answer import answer
+    out = answer("上次那个降压药还吃几天", _cond_records(),
+                 {"intent": "medication", "question_kind": "value",
+                  "time_scope": {"type": "latest"}, "hospital": "协和医院"})
+    assert "没有符合" in out["answer"] and out["citations"] == []
+
+
+def test_answer_class_keyword_falls_back_to_scope():
+    from app.agent.answer import answer
+    out = answer("上次那个降压药还吃几天", _cond_records(),
+                 {"intent": "medication", "question_kind": "value",
+                  "time_scope": {"type": "latest"}, "keywords": ["降压药"]})
+    assert out["citations"], "类别词没命中时不能直接判无记录"
+    assert "布地奈德福莫特罗" in out["answer"]
+
+
+def test_route_only_special_intents():
+    from app.api.routes_chat import _route_only
+    recs = _cond_records()
+    assert "我在" in _route_only({"intent": "smalltalk"}, recs)["answer"]
+    assert "120" in _route_only({"intent": "emergency"}, recs)["answer"]
+    assert "不能答" in _route_only({"intent": "out_of_scope"}, recs)["answer"]
+    unclear = _route_only({"intent": "unclear", "need_clarify": "你想问哪一次？"}, recs)
+    assert "最近三次" in unclear["answer"]
+    assert _route_only({"intent": "medication"}, recs) is None
+    assert _route_only(None, recs) is None

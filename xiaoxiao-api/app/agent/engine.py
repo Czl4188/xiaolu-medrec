@@ -35,6 +35,8 @@ OUT_OF_SCOPE = re.compile(
     r"可能是|应该是|考虑是|一般需要|通常|大概率|问题不大|不用担心|建议服用|建议停药"
 )
 UNIT_TOKEN = re.compile(r"\d+(?:\.\d+)?\s*(?:mg|g|ml|片|粒|袋|支|单位)", re.I)
+# 「共 14 天」不等于「还剩 14 天」：没有原文依据的剩余量属于推断
+REMAIN = re.compile(r"还剩|剩余|还能吃")
 # 疗程必须有「吃/服/用 + 数字 + 天/周」的原话；「两周后复诊」不算疗程
 DAYS_OK = re.compile(r"(?:吃|服|用|连服|共|吃满)\s*(?:\d+|[一二三四五六七八九十两]+)\s*(?:天|日|周|个星期|个月)")
 
@@ -103,6 +105,9 @@ def check_answer(text: str, facts: str) -> bool:
     if not text or len(text) < 4:
         return False
     if OUT_OF_SCOPE.search(text):
+        return False
+    if REMAIN.search(text) and not REMAIN.search(facts):
+        logger.warning("答案出现无依据的剩余量，丢弃：%s", text[:40])
         return False
     for token in UNIT_TOKEN.findall(text):
         if compact(token) not in compact(facts):
@@ -257,13 +262,14 @@ async def summarize(transcript: str, user_id: str, run_id: str | None = None) ->
         return None
 
 
-async def answer(question: str, facts: str, user_id: str, run_id: str | None = None) -> str | None:
+async def answer(question: str, facts: str, user_id: str, run_id: str | None = None,
+                 intent: str = "") -> str | None:
     """TASK=answer：只按 facts 作答，带 [R] 引用。失败或越界返回 None。"""
     if not is_ready() or not facts.strip():
         return None
     messages = [
         {"role": "system", "content": system_for("answer")},
-        {"role": "user", "content": f"【问题】{question}\n\n【档案】\n{facts}"},
+        {"role": "user", "content": f"【意图】{intent or '未提供'}\n\n【问题】{question}\n\n【档案】\n{facts}"},
     ]
     try:
         text = await llm.complete(
@@ -283,6 +289,11 @@ async def answer(question: str, facts: str, user_id: str, run_id: str | None = N
         logger.warning("answer 未过守门，丢弃（%s 字）", len(text))
         return None
     return text
+
+
+def loads_json(raw: str) -> dict | None:
+    """公开的 JSON 解析器，供归一模块复用。"""
+    return _loads_json(raw)
 
 
 def parse_transcribe(raw: str) -> dict:

@@ -141,6 +141,7 @@ async def complete(
     max_tokens: int | None = None,
     timeout: float | None = None,
     model: str = "",
+    retries: int | None = None,
 ) -> str:
     if not is_configured():
         raise LLMNotConfigured("未配置模型")
@@ -152,7 +153,8 @@ async def complete(
             models.append(candidate)
 
     last_error: Exception | None = None
-    deadline = time.monotonic() + settings.llm_timeout_seconds * (settings.llm_max_retries + 1)
+    attempts = settings.llm_max_retries if retries is None else max(0, retries)
+    deadline = time.monotonic() + (timeout or settings.llm_timeout_seconds) * (attempts + 1)
 
     async with _sem():
         for model in models:
@@ -162,7 +164,7 @@ async def complete(
                 last_error = LLMError("circuit open", retryable=True)
                 continue
 
-            for attempt in range(settings.llm_max_retries + 1):
+            for attempt in range(attempts + 1):
                 if time.monotonic() > deadline:
                     break
                 started = time.monotonic()

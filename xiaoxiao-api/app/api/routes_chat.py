@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.agent import answer as answer_agent
 from app.agent import engine
+from app.agent import normalize as normalize_agent
 from app.api.deps import current_user, rate_limit
 from app.db import repo
 from app.db.models import User
@@ -44,6 +45,52 @@ def _records_payload(records) -> list[dict]:
         }
         for r in records
     ]
+
+
+EMERGENCY_ANSWER = (
+    "这属于可能需要紧急处理的情况，我不能通过病历问答帮你判断。\n\n"
+    "请立即拨打 120（或当地急救电话），或尽快到最近的急诊。\n"
+    "如果出现胸痛、呼吸困难、意识不清、大出血，不要自行服药、不要等待观察。"
+)
+
+OUT_OF_SCOPE_ANSWER = (
+    "这条我不能答。\n\n"
+    "能不能吃、要不要停药、严不严重，这类判断属于诊疗，不在记录工具的范围内。\n\n"
+    "我能告诉你的是：医生当时怎么交代的、开了哪些药、什么时候复诊。"
+)
+
+SMALLTALK_ANSWER = "我在。想问档案里的哪件事？比如「上次开了什么药」「什么时候复诊」。"
+
+
+def _recent_lines(records) -> str:
+    rows = list(records)[:3]
+    if not rows:
+        return "你的档案里还没有记录。"
+
+    def field(r, key):
+        return r.get(key) if isinstance(r, dict) else getattr(r, key, None)
+
+    return "最近三次：\n" + "\n".join(
+        f"- {answer_agent.fmt_date(field(r, 'visit_at'))} {field(r, 'hospital') or '未记录医院'}"
+        for r in rows
+    )
+
+
+def _route_only(cond: dict | None, records) -> dict | None:
+    """闲聊 / 求建议 / 急症 / 说不清：不检索、不调 chat，固定话术。"""
+    if not cond:
+        return None
+    intent = cond.get("intent")
+    if intent == "emergency":
+        return {"answer": EMERGENCY_ANSWER, "citations": [], "refused": True}
+    if intent == "out_of_scope":
+        return {"answer": OUT_OF_SCOPE_ANSWER, "citations": [], "refused": True}
+    if intent == "smalltalk":
+        return {"answer": SMALLTALK_ANSWER, "citations": [], "refused": False}
+    if intent == "unclear":
+        tip = cond.get("need_clarify") or "你是想问哪一次？"
+        return {"answer": f"{tip}\n\n{_recent_lines(records)}", "citations": [], "refused": True}
+    return None
 
 
 def _facts_block(result: dict, records) -> str:
@@ -88,14 +135,15 @@ def _facts_block(result: dict, records) -> str:
 
 
 async def _compose(question: str, result: dict, records, user_id: str,
-                   run_id: str, db: Session) -> str:
+                   run_id: str, db: Session, cond: dict | None = None) -> str:
     """理解引擎 TASK=answer 作答；拒答/无来源不调模型，失败立刻退回规则答案。"""
     if result.get("refused") or not result.get("citations"):
         return result["answer"]
 
     facts = _facts_block(result, records)
     started = time.monotonic()
-    text = await engine.answer(question, facts, user_id, run_id)
+    text = await engine.answer(question, facts, user_id, run_id,
+                               intent=(cond or {}).get("intent", ""))
     if text:
         # 模型答案与规则答案的引用是否一致：不一致只记日志，不阻断
         if "[R" not in text:
@@ -111,15 +159,31 @@ async def _compose(question: str, result: dict, records, user_id: str,
     return result["answer"]
 
 
-def _prepare(db: Session, user: User, body: ChatIn):
+async def _prepare(db: Session, user: User, body: ChatIn):
     records = repo.list_records(db, user.id)
-    result = answer_agent.answer(body.question, _records_payload(records))
+
+    # 先归一：模型只译不答；失败/超时/低置信度都返回 None，退回原句检索
+    vocab = normalize_agent.build_vocab(records)
+    cond = await normalize_agent.normalize(body.question, user.id, vocab)
+
+    routed = _route_only(cond, records)
+    if routed is not None:
+        result = routed
+    else:
+        result = answer_agent.answer(body.question, _records_payload(records), cond)
+
     run, _ = repo.create_run(
         db, user.id, "chat", {"question": body.question},
         idempotency_key=body.idempotency_key or None,
     )
-    repo.add_step(db, run.id, 1, "retrieve_records", detail={"count": len(records)})
-    return run, result, records
+    repo.add_step(db, run.id, 1, "retrieve_records", detail={
+        "count": len(records),
+        "intent": (cond or {}).get("intent", ""),
+        "confidence": (cond or {}).get("confidence", 0),
+        "normalize_fallback": cond is None,
+        "routed": routed is not None,
+    })
+    return run, result, records, cond
 
 
 @router.post("/sync", response_model=AnswerOut, dependencies=[Depends(rate_limit("chat", 30))])
@@ -128,8 +192,8 @@ async def chat_sync(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> AnswerOut:
-    run, result, records = _prepare(db, user, body)
-    text = await _compose(body.question, result, records, user.id, run.id, db)
+    run, result, records, cond = await _prepare(db, user, body)
+    text = await _compose(body.question, result, records, user.id, run.id, db, cond)
     repo.add_step(db, run.id, 2, "compose_answer", detail={"refused": result["refused"]})
     repo.finish_run(db, run.id, "ok", {"answer": text, "refused": result["refused"]})
     return AnswerOut(
@@ -145,7 +209,7 @@ async def chat_stream(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    run, result, records = _prepare(db, user, body)
+    run, result, records, cond = await _prepare(db, user, body)
 
     async def events():
         def sse(event: str, data: dict) -> str:
@@ -165,7 +229,7 @@ async def chat_stream(
             "refused": result["refused"],
         })
 
-        text = await _compose(body.question, result, records, user.id, run.id, db)
+        text = await _compose(body.question, result, records, user.id, run.id, db, cond)
 
         # 注意：这是「按句切片推送」，不是 token 级流式。
         # 换真流式只需把这里换成读取模型 SSE；传输格式不用变。
