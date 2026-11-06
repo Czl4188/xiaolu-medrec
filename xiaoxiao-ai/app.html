@@ -850,6 +850,36 @@ body[data-view="ask"] #app{height:100dvh}
   .sheet-dialog__alert b{font-size:12.5px}
 }
 
+/* ————————— 过敏提醒：纯文字，不弹窗 —————————
+   红＝用户当前正在处理这个药（问它 / 要把它入库）
+   黄＝只是复述档案内容时顺带出现，药不在手上 */
+.algb{
+  border:1px solid var(--accent);border-left:3px solid var(--accent);
+  background:var(--accent-wash);color:var(--ink);
+  padding:11px 13px;margin:10px 0;font-size:12.5px;line-height:1.8;
+}
+.algb__hd{
+  font-family:var(--font-display);font-weight:700;font-size:10.5px;
+  letter-spacing:.1em;color:var(--accent-ink);margin-bottom:5px;
+}
+.algb p{margin:0 0 2px;max-width:none}
+.algb p:last-child{margin-bottom:0}
+.algb b{font-weight:700}
+.algb--soft{border-color:var(--amber);border-left-color:var(--amber);background:var(--amber-wash)}
+.algb--soft .algb__hd{color:var(--amber-ink)}
+.algb-band{
+  margin:14px 0 0;padding:10px 13px;
+  border:1px solid var(--amber);border-left:3px solid var(--amber);
+  background:var(--amber-wash);color:var(--amber-ink);
+  font-size:12px;line-height:1.7;
+}
+.algb-band .meta{display:block;color:inherit;opacity:.72;margin-bottom:3px}
+.algb-band b{font-family:var(--font-display);font-weight:700}
+@media (max-width:390px){
+  .algb{padding:9px 11px;font-size:12px}
+  .algb-band{font-size:11.5px;padding:9px 11px}
+}
+
 
 .toast{
   position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);
@@ -1317,6 +1347,9 @@ body[data-view="ask"] #app{height:100dvh}
           <p class="home__facts" id="homeFacts">资料待完善</p>
         </div>
       </div>
+
+      <!-- 过敏史常驻最上方：不管这次有没有提到，都摆在这里 -->
+      <div id="homeAllergy"></div>
 
       <div class="home__grid">
         <button class="start-card" id="startBtn" type="button">
@@ -1800,6 +1833,7 @@ body[data-view="ask"] #app{height:100dvh}
       <div><dt>抽到字段</dt><dd id="dlgFields">0 项</dd></div>
       <div><dt>未提到</dt><dd id="dlgHoles">0 项</dd></div>
     </dl>
+    <div id="dlgAllergy"></div>
     <div class="dlgform" id="dlgForm"></div>
     <div class="sheet-dialog__actions">
       <button class="btn btn--primary" value="yes" id="saveYes" type="submit">保存到档案</button>
@@ -2233,6 +2267,7 @@ body[data-view="ask"] #app{height:100dvh}
     acct: '',            // 本地数据归属键：服务端用 id，本机用手机号
     calPending: false,   // 刚结束一次录音，等归档弹窗关闭后问日历
     consentSeen: false,  // 本次登录是否已经看过录音同意提示
+    algSeen: {},         // 过敏提醒已提示过的键：recId|过敏原|药名，同会话只提醒一次
     editId: '',          // 正在修改的已归档记录
     editDraft: null,
     theme: 'warm',
@@ -2856,6 +2891,7 @@ body[data-view="ask"] #app{height:100dvh}
     state.chatReady = false;
     state.chatLog = [];
     state.consentSeen = false;
+    state.algSeen = {};   /* 换账号后重新按新档案提醒一遍 */
     state.ai = null;
     state.aiOn = false;
     state.aiText = '';
@@ -3477,7 +3513,7 @@ body[data-view="ask"] #app{height:100dvh}
     var tagText = state.scan.source === 'qwen' ? '千问识图 · 可改'
       : (state.scan.source === 'history' ? '历史记录 · 可改' : '手动录入 · 待核对');
 
-    box.innerHTML = meds.map(function (m, i) {
+    box.innerHTML = algMedsHtml(meds) + meds.map(function (m, i) {
       var opt = function (v) {
         return '<option value="' + v + '"' + (m.timing === v ? ' selected' : '') + '>' + v + '</option>';
       };
@@ -3863,6 +3899,8 @@ body[data-view="ask"] #app{height:100dvh}
     }
     $('#homeFacts').innerHTML = html;
     $('#homeRecCount').textContent = state.records.length + ' 份记录';
+    /* 过敏史常驻：不管这次有没有提到，都摆在最上面 */
+    if ($('#homeAllergy')) $('#homeAllergy').innerHTML = algHomeHtml();
     geoRender();
   }
 
@@ -4397,7 +4435,7 @@ body[data-view="ask"] #app{height:100dvh}
             '<dt>复诊</dt><dd>' + esc(d.followUp || '未提到') + '</dd>' +
             '<dt>过敏</dt><dd>' + esc(d.allergy || '未提到') + '</dd>' +
           '</dl>' +
-          '<p class="tl__label">用药</p>' + medHtml +
+          '<p class="tl__label">用药</p>' + algMedsHtml(panelMeds) + medHtml +
           notesHtml +
         '</div>' +
         '<div class="rec-card__ft"><span>' + esc(d.id) + '</span><span>' +
@@ -5383,6 +5421,8 @@ body[data-view="ask"] #app{height:100dvh}
     $('#dlgHoles').textContent = countHoles(d) + ' 项';
     $('#saveTitle').textContent = '这次记录对吗？存进档案前可以直接改';
     fillSaveForm();
+    /* 归档前最后一道：药名和过敏史在弹窗里再对一次 */
+    if ($('#dlgAllergy')) $('#dlgAllergy').innerHTML = algMedsHtml(d.meds);
     openDialog(dlg);
   }
 
@@ -5420,6 +5460,7 @@ body[data-view="ask"] #app{height:100dvh}
     $('#dlgHoles').textContent = '—';
     $('#saveTitle').textContent = '修改这份记录';
     fillSaveForm();
+    if ($('#dlgAllergy')) $('#dlgAllergy').innerHTML = algMedsHtml(state.editDraft.meds);
     openDialog($('#saveDialog'));
   }
 
@@ -6041,6 +6082,192 @@ body[data-view="ask"] #app{height:100dvh}
     setTimeout(function () { runAction(it.id, it.recordId); }, 500);
   }
 
+  /* ============================================================
+     过敏提醒
+     —— 这不是医学预警，是「不让系统忘记」。
+     只复述两件事：档案里记过什么、当前提到的药属于哪一类。
+     最后一句永远是「请向医生确认」。
+     不做诊断、不给用药建议、不判断轻重、不改档案。
+     ============================================================ */
+
+  /* 四组常见过敏原与同类药，只用于命中判断，绝不用于生成建议。
+     跨组不查：头孢与青霉素是否交叉过敏属于医学判断，不在本工具权限内。 */
+  var ALLERGY_GROUPS = {
+    '青霉素类': {
+      aliases: ['青霉素', '盘尼西林', 'penicillin'],
+      members: ['阿莫西林', '氨苄西林', '哌拉西林', '青霉素V钾', '苯唑西林', '氯唑西林', '美洛西林']
+    },
+    '磺胺类': {
+      aliases: ['磺胺', 'sulfonamide'],
+      members: ['复方磺胺甲噁唑', '磺胺嘧啶', '磺胺甲噁唑', '柳氮磺吡啶', '磺胺醋酰钠']
+    },
+    '头孢类': {
+      aliases: ['头孢', '头孢菌素', 'cephalosporin'],
+      members: ['头孢氨苄', '头孢拉定', '头孢呋辛', '头孢克肟', '头孢地尼', '头孢丙烯', '头孢曲松', '头孢他啶']
+    },
+    '解热镇痛药（NSAIDs）': {
+      aliases: ['阿司匹林', 'aspirin', '乙酰水杨酸', '布洛芬', 'ibuprofen', '芬必得', '非甾体'],
+      members: ['阿司匹林', '布洛芬', '双氯芬酸', '吲哚美辛', '萘普生', '洛索洛芬', '塞来昔布', '美洛昔康']
+    }
+  };
+
+  var ALG_SPLIT = /[、，,;；\/|]/;
+
+  /* 档案里存的是整句（"青霉素过敏"、"青霉素、磺胺过敏"），要拆开并剥掉后缀才能比对 */
+  function algNorm(raw) {
+    return clean(raw).replace(/(?:过敏|不耐受)$/, '').trim();
+  }
+
+  function algGroupOf(term) {
+    var names = Object.keys(ALLERGY_GROUPS);
+    for (var i = 0; i < names.length; i++) {
+      var g = ALLERGY_GROUPS[names[i]];
+      for (var j = 0; j < g.aliases.length; j++) {
+        if (term === g.aliases[j]) return { name: names[i], g: g };
+      }
+    }
+    for (var k = 0; k < names.length; k++) {
+      var g2 = ALLERGY_GROUPS[names[k]];
+      for (var m = 0; m < g2.aliases.length; m++) {
+        if (term.indexOf(g2.aliases[m]) >= 0) return { name: names[k], g: g2 };
+      }
+    }
+    return null;
+  }
+
+  /* 阳性优先；全档只有「否认过敏」时整层关闭——allergy_denied 从一条数据变成开关 */
+  function algFacts() {
+    var recs = sortedDesc();
+    var items = [], seen = {}, denied = false;
+    for (var i = 0; i < recs.length; i++) {
+      var r = recs[i];
+      if (r.allergyDenied && !clean(r.allergy)) { denied = true; continue; }
+      var terms = clean(r.allergy).split(ALG_SPLIT);
+      for (var j = 0; j < terms.length; j++) {
+        var term = algNorm(terms[j]);
+        if (term.length < 2 || seen[term]) continue;
+        seen[term] = 1;
+        var g = algGroupOf(term);
+        items.push({ term: term, group: g ? g.name : '', members: g ? g.g.members : [], rec: r });
+      }
+    }
+    return { items: items, off: !items.length, denied: denied };
+  }
+
+  /* 在问句里找命中：本体优先取红，同类药取黄，同一条过敏原只出一条 */
+  function algHitsInText(text) {
+    var f = algFacts();
+    if (f.off) return [];
+    var t = clean(text);
+    if (!t) return [];
+    var hits = [];
+    for (var i = 0; i < f.items.length; i++) {
+      var it = f.items[i];
+      var drug = '', kind = '';
+      for (var j = 0; j < it.members.length; j++) {
+        if (it.members[j] !== it.term && t.indexOf(it.members[j]) >= 0) { drug = it.members[j]; kind = 'class'; break; }
+      }
+      if (t.indexOf(it.term) >= 0) { drug = it.term; kind = 'self'; }
+      if (kind) hits.push({ fact: it, drug: drug, kind: kind });
+    }
+    return hits;
+  }
+
+  /* 在药名列表里找命中：录入 / 识药 / 归档弹窗共用 */
+  function algHitsInMeds(meds) {
+    var f = algFacts();
+    if (f.off) return [];
+    var list = namedMeds(meds || []);
+    var hits = [];
+    for (var i = 0; i < list.length; i++) {
+      var name = clean(list[i].name);
+      if (!name) continue;
+      for (var j = 0; j < f.items.length; j++) {
+        var it = f.items[j];
+        var kind = '';
+        if (name.indexOf(it.term) >= 0) kind = 'self';
+        else {
+          for (var k = 0; k < it.members.length; k++) {
+            if (name.indexOf(it.members[k]) >= 0) { kind = 'class'; break; }
+          }
+        }
+        if (kind) hits.push({ fact: it, drug: name, kind: kind });
+      }
+    }
+    return hits;
+  }
+
+  /* 卡片里的日期固定 YYYY-MM-DD，不跟随界面上的本地化格式 */
+  function algDate(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  /* 三段式固定文案：前端直接拼，不经过 /api/ai/chat，不改写不缩短不加判断词。
+     没有出处（第几次 + 日期）就整条不显示。 */
+  function algCardHtml(hit, soft) {
+    var rec = hit.fact.rec;
+    if (!rec || !rec.at) return '';
+    var seq = seqOf(rec);
+    if (!seq) return '';
+    return '<div class="algb' + (soft ? ' algb--soft' : '') + '" role="note">' +
+      '<div class="algb__hd">过敏提醒 · 仅复述档案</div>' +
+      '<p>档案里记录：第 ' + seq + ' 次就诊（' + algDate(rec.at) + '），你对 <b>' +
+        esc(hit.fact.term) + '</b> 过敏。</p>' +
+      '<p>当前提到的 <b>' + esc(hit.drug) + '</b> 属于 <b>' + esc(hit.fact.group || '同一类') + '</b>。</p>' +
+      '<p>请向医生确认。</p>' +
+      '</div>';
+  }
+
+  /* 给药名列表直接出卡片（录入 / 识药 / 归档弹窗共用，药在手上用红卡） */
+  function algMedsHtml(meds) {
+    return algHitsInMeds(meds).map(function (h) { return algCardHtml(h, false); }).join('');
+  }
+
+  function algKey(hit) {
+    return (hit.fact.rec ? hit.fact.rec.id : '') + '|' + hit.fact.term + '|' + hit.drug;
+  }
+
+  /* 同一份档案、同一次会话里，同一件事只提醒一次 */
+  function algPush(hits, soft, beforeEl) {
+    var fresh = [];
+    for (var i = 0; i < hits.length; i++) {
+      var k = algKey(hits[i]);
+      if (state.algSeen[k]) continue;
+      state.algSeen[k] = 1;
+      fresh.push(hits[i]);
+    }
+    var html = fresh.map(function (h) { return algCardHtml(h, soft); }).join('');
+    if (!html) return;
+    var thread = $('#thread');
+    if (!thread) return;
+    var el = document.createElement('div');
+    el.className = 'alg-row';
+    el.innerHTML = html;
+    if (beforeEl && beforeEl.parentNode === thread) thread.insertBefore(el, beforeEl);
+    else thread.appendChild(el);
+    scrollThread();
+  }
+
+  /* 首页常驻条：只说档案里记了什么，不做任何判断 */
+  function algHomeHtml() {
+    var f = algFacts();
+    if (f.off) {
+      if (!f.denied) return '';
+      var drec = sortedDesc().filter(function (r) { return r.allergyDenied; })[0];
+      return '<div class="algb-band" role="note"><span class="meta">过敏史 · 常驻</span>' +
+        '档案里记录：' + (drec ? '第 ' + seqOf(drec) + ' 次就诊（' + algDate(drec.at) + '），' : '') +
+        '你否认药物过敏。</div>';
+    }
+    var names = f.items.map(function (it) {
+      return '<b>' + esc(it.term) + '</b>' + (it.group ? '（' + esc(it.group) + '）' : '');
+    }).join('、');
+    var rec = f.items[0].rec;
+    return '<div class="algb-band" role="note"><span class="meta">过敏史 · 常驻</span>' +
+      '档案里记录：第 ' + seqOf(rec) + ' 次就诊（' + algDate(rec.at) + '），你对 ' + names + ' 过敏。' +
+      '<br>每次录入和提问都会按这份记录提醒你。</div>';
+  }
+
   function send() {
     var input = $('#askInput');
     var q = input.value.trim();
@@ -6069,6 +6296,18 @@ body[data-view="ask"] #app{height:100dvh}
     remember('user', q);
     input.value = '';
     autoGrow();
+
+    /* 过敏提醒：本机先算、先插卡，再走问答。
+       ① 问句里直接提到 → 用户正对着这个药，红卡
+       ② 问「开了什么药」这类 → 档案药单也过一遍，药不在手上，黄卡
+       正在问过敏本身时不重复弹卡，交给正常问答回答。 */
+    if (!/过敏|不耐受/.test(q)) {
+      algPush(algHitsInText(q), false);
+      if (/什么药|用药|药单|吃什么|开了什么|开的什么|用过什么/.test(q)) {
+        var algPool = sortedDesc().filter(function (r) { return namedMeds(r.meds || []).length; });
+        if (algPool.length) algPush(algHitsInMeds(algPool[0].meds), true);
+      }
+    }
 
     /* ① 本地关键词快判：不占模型；开关关掉时整层不生效 */
     var actId = state.nlActionOn ? detectActionLocal(q) : null;
@@ -6120,6 +6359,17 @@ body[data-view="ask"] #app{height:100dvh}
           /* 闲聊、简单问答与危机话术不该挂「病历整理」的免责声明 */
           var medical = (kind === 'smalltalk' || kind === 'free' || kind === 'crisis')
             ? false : (!res.refused || /120|急诊/.test(res.answer));
+          /* 回答引用了哪一次记录，就把那次药单也过一遍：
+             命中靠内容，不靠「过敏」这个词。药不在手上，用软提示。 */
+          var algIds = buildCloudSources(res).map(function (s) { return s.recId; }).filter(Boolean);
+          if (algIds.length) {
+            var algMeds = [];
+            algIds.forEach(function (id) {
+              var rr = state.records.filter(function (x) { return x.id === id; })[0];
+              if (rr) algMeds = algMeds.concat(namedMeds(rr.meds || []));
+            });
+            if (algMeds.length) algPush(algHitsInMeds(algMeds), true);
+          }
           addBot(buildCloudParas(res), buildCloudSources(res), medical);
         })
         .catch(function (e) {
