@@ -867,13 +867,15 @@ body[data-view="ask"] #app{height:100dvh}
 .algb b{font-weight:700}
 .algb--soft{border-color:var(--amber);border-left-color:var(--amber);background:var(--amber-wash)}
 .algb--soft .algb__hd{color:var(--amber-ink)}
+/* 过敏史条跟主题走主色：暖纸=砖红、暗色=珊瑚、冷白=青绿、樱粉=玫红。
+   之前用 --amber，四套主题的 amber 都接近米黄，看起来像没跟主题变。 */
 .algb-band{
   margin:14px 0 0;padding:10px 13px;
-  border:1px solid var(--amber);border-left:3px solid var(--amber);
-  background:var(--amber-wash);color:var(--amber-ink);
+  border:1px solid var(--accent);border-left:3px solid var(--accent);
+  background:var(--accent-wash);color:var(--ink);
   font-size:12px;line-height:1.7;
 }
-.algb-band .meta{display:block;color:inherit;opacity:.72;margin-bottom:3px}
+.algb-band .meta{display:block;color:var(--accent-ink);margin-bottom:3px}
 .algb-band b{font-family:var(--font-display);font-weight:700}
 /* 「我的」侧栏里的位置由外层控制，避免和资料表单的间距叠加 */
 #mineAllergy{margin:16px 0 0}
