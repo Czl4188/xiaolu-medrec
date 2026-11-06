@@ -102,5 +102,7 @@ async def route_action(question: str, history, user_id: str,
 
     result = sanitize(data)
     if result["action"]:
-        logger.info("动作识别：%s（%.2f）", result["action"], result["confidence"])
+        logger.info("动作识别：%s（%.2f）← %s", result["action"], result["confidence"], text[:30])
+    else:
+        logger.info("动作识别为 null ← %s", text[:30])
     return result

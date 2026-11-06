@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     answer_temperature: float = 0.35
     # 自然语言唤起动作：0 = 关闭（不识别、不出确认气泡）
     nl_action: int = 0
-    nl_action_timeout: float = 2.5
+    nl_action_timeout: float = 5.0
     # 日期/「距今几天」按这个时区算，避免服务器在 UTC 时把「今天」答错一天
     app_timezone: str = "Asia/Shanghai"
     llm_vision_model: str = "qwen3-vl-plus"   # 识图模型（兼容 OpenAI 多模态格式）
