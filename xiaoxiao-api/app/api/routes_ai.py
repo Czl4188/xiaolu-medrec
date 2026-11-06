@@ -15,6 +15,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.agent import action_router
 from app.agent import engine
 from app.api.deps import current_user, rate_limit
 from app.core.config import settings
@@ -70,7 +71,20 @@ def ai_status(_user: User = Depends(current_user)) -> dict:
         "enabled": on,
         "text_model": settings.llm_model if on else "",
         "vision_model": settings.llm_vision_model if on else "",
+        # 自然语言唤起：前端据此决定要不要出确认气泡
+        "nl_action": bool(on and settings.nl_action),
     }
+
+
+class ActionIn(BaseModel):
+    question: str = Field(min_length=1, max_length=200)
+    history: list[dict] = Field(default_factory=list)
+
+
+@router.post("/action", dependencies=[Depends(rate_limit("ai:action", 30))])
+async def action(body: ActionIn, user: User = Depends(current_user)) -> dict:
+    """一句话 → 动作编号。识别不了就返回 null，前端照常走问答。"""
+    return await action_router.route_action(body.question, body.history, user.id)
 
 
 async def _call(

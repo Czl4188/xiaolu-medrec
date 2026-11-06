@@ -1332,3 +1332,21 @@ def test_answer_guard_rejects_made_up_days():
     assert check_answer("查到了，10 月 30 日那次开了奥美拉唑。[R1]", facts)
     assert not check_answer("奥美拉唑要吃 21 天。[R1]", facts), "天数必须有依据"
     assert not check_answer('{"intent":"medication"}', facts), "JSON 契约不是答案"
+
+# ————————————————— 自然语言唤起 —————————————————
+def test_action_sanitize_three_checks():
+    from app.agent.action_router import sanitize
+
+    ok = sanitize({"action": "scan_camera", "confidence": 0.9, "say": "要打开拍照识药吗？"})
+    assert ok["action"] == "scan_camera" and ok["confidence"] == 0.9
+    assert sanitize({"action": "rm_rf", "confidence": 1})["action"] is None
+    assert sanitize({"action": "scan_camera", "confidence": 0.3})["action"] is None
+    assert len(sanitize({"action": "logout", "confidence": 0.9, "say": "x" * 40})["say"]) == 20
+
+
+def test_action_endpoint_is_silent_when_off(client, fresh_headers):
+    body = client.post("/api/ai/action", headers=fresh_headers,
+                       json={"question": "拍照识药"}).json()
+    assert body == {"action": None, "confidence": 0.0, "say": ""}
+    status = client.get("/api/ai/status", headers=fresh_headers).json()
+    assert status["nl_action"] is False
