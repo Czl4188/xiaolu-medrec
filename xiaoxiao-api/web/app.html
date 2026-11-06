@@ -5784,6 +5784,78 @@ body[data-view="ask"] #app{height:100dvh}
     ], [], false);
   }
 
+  /* ————————————————— 询问页 · 自然语言跳转 —————————————————
+     说「拍照识药」「打开日历」「导出档案」这类话，不占模型、不查档案，
+     直接把用户带到对应页面并触发那个功能。
+
+     只认指令、不抢提问：带疑问词或长过 24 个字的，一律交回正常问答。
+     这一层只做跳转，不产生任何医疗结论。 */
+  var ASK_NAV = [
+    { w: ['拍照识药', '识药', '拍药', '扫描药盒', '认药'],
+      view: 'scan',
+      say: '好，带你去拍照识药。对准药盒或处方拍一张，我来认药名、剂量和用法。' },
+    { w: ['工作台', '开始录音', '录音页', '整理记录', '记录页'],
+      view: 'work',
+      say: '好，到工作台了。点右上「开始录音」，或者把问诊内容贴进「手动整理」。' },
+    { w: ['我的档案', '全部记录', '档案列表', '就诊记录', '我的', '档案'],
+      view: 'mine',
+      say: '好，到「我的」了。这里能翻全部档案、搜索、导出和打印。' },
+    { w: ['首页', '主页'], view: 'home', say: '好，回首页了。' },
+    { w: ['导出档案', '导出', '备份'],
+      view: 'mine', action: 'export',
+      say: '好，正在把档案导出成 JSON 备份。' },
+    { w: ['打印', '存pdf', '导出pdf'],
+      view: 'mine', action: 'print',
+      say: '好，打开打印预览，可以直接打印或存成 PDF。' },
+    { w: ['导入档案', '导入', '恢复档案'],
+      view: 'mine', action: 'import',
+      say: '好，打开导入，选之前导出的 JSON 文件就行。' },
+    { w: ['改密码', '修改密码', '账号安全', '注销账号'],
+      view: 'mine', action: 'account',
+      say: '好，到「我的」→「账号与安全」，改密码和注销都在这里。' },
+    { w: ['日历', '日程', '加到日历', '加进日历', '放进日历'],
+      action: 'calendar',
+      say: '好，我把最近一次的复诊和用药整理成日程文件。' }
+  ];
+
+  function askNav(text) {
+    /* 去掉标点空白并转小写，让「存 PDF」和「存pdf」都能认 */
+    var t = String(text || '').replace(/[\s，。！？、；：,.!?;:~～…\-—_()（）「」]/g, '').toLowerCase();
+    if (!t || t.length > 24) return null;
+    /* 疑问句交给问答：宁可少跳一次，也不能把「我几点吃药」当成指令 */
+    if (/什么|哪|几|多少|吗|呢|是不是|有没有|怎么|为什么|如何|咋|时候|能不能|可不可以/.test(t)) return null;
+    var VERB = /打开|进入|跳转|切换|带我去|帮我|我要|我想|开始|去|用|来|看一下|看看/;
+    for (var i = 0; i < ASK_NAV.length; i++) {
+      var it = ASK_NAV[i];
+      for (var j = 0; j < it.w.length; j++) {
+        var w = it.w[j];
+        if (t === w) return it;
+        if (t.indexOf(w) >= 0 && VERB.test(t)) return it;
+      }
+    }
+    return null;
+  }
+
+  function runAskNav(it) {
+    if (it.view) go(it.view);
+    /* 等目标页渲染完再触发按钮，否则可能点空 */
+    setTimeout(function () {
+      if (it.action === 'export' && $('#exportBtn')) { $('#exportBtn').click(); return; }
+      if (it.action === 'print' && $('#printBtn')) { $('#printBtn').click(); return; }
+      if (it.action === 'import' && $('#importBtn')) { $('#importBtn').click(); return; }
+      if (it.action === 'account') {
+        var box = $('#acctBox');
+        if (box) { box.open = true; box.scrollIntoView({ block: 'center' }); }
+        return;
+      }
+      if (it.action === 'calendar') {
+        var list = sortedDesc();
+        if (!list.length) { toast('还没有档案。先在「记录」里整理一份，再来加日历。'); return; }
+        addRecordToCalendar(list[0].id);
+      }
+    }, it.view ? 260 : 0);
+  }
+
   function send() {
     var input = $('#askInput');
     var q = input.value.trim();
@@ -5797,6 +5869,16 @@ body[data-view="ask"] #app{height:100dvh}
     remember('user', q);
     input.value = '';
     autoGrow();
+
+    /* 先看这句是不是「带我去做某件事」：是就直接跳过去，不进问答、不占模型 */
+    var nav = askNav(q);
+    if (nav) {
+      addBot([P(esc(nav.say))], [], false);
+      remember('assistant', nav.say);
+      runAskNav(nav);
+      return;
+    }
+
     state.busy = true;
 
     var holder = document.createElement('div');
