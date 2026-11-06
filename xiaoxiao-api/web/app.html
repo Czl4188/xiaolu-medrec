@@ -875,6 +875,9 @@ body[data-view="ask"] #app{height:100dvh}
 }
 .algb-band .meta{display:block;color:inherit;opacity:.72;margin-bottom:3px}
 .algb-band b{font-family:var(--font-display);font-weight:700}
+/* 「我的」侧栏里的位置由外层控制，避免和资料表单的间距叠加 */
+#mineAllergy{margin:16px 0 0}
+#mineAllergy .algb-band{margin:0}
 @media (max-width:390px){
   .algb{padding:9px 11px;font-size:12px}
   .algb-band{font-size:11.5px;padding:9px 11px}
@@ -1385,9 +1388,6 @@ body[data-view="ask"] #app{height:100dvh}
         语音识别由浏览器提供的服务完成，可能经由浏览器厂商的云端；转写后的文字才存进你的档案。
         <b>小鹿不做诊断</b>，内容不构成诊疗建议。
       </p>
-
-      <!-- 过敏史常驻：放在首页最下方，不管这次有没有提到都摆在这里 -->
-      <div id="homeAllergy"></div>
     </div>
   </section>
 
@@ -1407,6 +1407,9 @@ body[data-view="ask"] #app{height:100dvh}
             <p class="mine__facts" id="profMeta">—</p>
           </div>
         </div>
+
+        <!-- 过敏史：按全部档案汇总，阳性优先；没有记录时这里不占位 -->
+        <div id="mineAllergy"></div>
 
         <form class="mine__form" id="profForm">
           <label class="field">
@@ -3899,8 +3902,6 @@ body[data-view="ask"] #app{height:100dvh}
     }
     $('#homeFacts').innerHTML = html;
     $('#homeRecCount').textContent = state.records.length + ' 份记录';
-    /* 过敏史常驻：不管这次有没有提到，都摆在最上面 */
-    if ($('#homeAllergy')) $('#homeAllergy').innerHTML = algHomeHtml();
     geoRender();
   }
 
@@ -4060,6 +4061,8 @@ body[data-view="ask"] #app{height:100dvh}
     $('#fGender').value = p.gender || '';
 
     $('#recCount').textContent = state.records.length + ' 份';
+    /* 过敏史：按全部档案汇总后放在「我的」侧栏，阳性优先 */
+    if ($('#mineAllergy')) $('#mineAllergy').innerHTML = algMineHtml();
     fillHospFilter();
     updateAcctMode();
     renderRecords();
@@ -6252,8 +6255,8 @@ body[data-view="ask"] #app{height:100dvh}
     scrollThread();
   }
 
-  /* 首页常驻条：只说档案里记了什么，不做任何判断 */
-  function algHomeHtml() {
+  /* 「我的」侧栏的过敏史汇总：只说档案里记了什么，不做任何判断 */
+  function algMineHtml() {
     var f = algFacts();
     if (f.off) {
       if (!f.denied) return '';
