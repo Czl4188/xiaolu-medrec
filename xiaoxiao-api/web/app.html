@@ -1188,13 +1188,9 @@ body[data-view="ask"] #app{height:100dvh}
   .thread{scroll-behavior:auto}
 }
 
-/* ——————————— 自然语言唤起：确认按钮 / 顶部横条 / 高亮 ——————————— */
+/* ——————————— 自然语言唤起：确认按钮 / 高亮 ——————————— */
 .act-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .act-list{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:10px}
-.nl-topbar{position:fixed;left:0;right:0;top:0;height:44px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 16px;background:var(--ink);color:var(--paper);font-size:13px;z-index:80;transform:translateY(-100%);transition:transform .18s ease}
-.nl-topbar.is-on{transform:translateY(0)}
-body.has-topbar{padding-top:44px}
-.nl-topbar__undo{background:none;border:1px solid var(--paper);color:var(--paper);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer}
 .is-pulse{animation:nl-pulse 1s ease-in-out 3;outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 @keyframes nl-pulse{0%,100%{box-shadow:0 0 0 0 rgba(166,52,31,0)}50%{box-shadow:0 0 0 6px rgba(166,52,31,.28)}}
 </style>
@@ -5800,6 +5796,7 @@ body.has-topbar{padding-top:44px}
 
   /* ————————————————— 询问页 · 自然语言唤起 —————————————————
      说一句话 → 先问「要打开××吗？」→ 用户点「打开」才跳过去并执行。
+     跳转后不再弹顶部提示条、不给「撤销」：跳出确认气泡就是用户已经同意了。
      危险动作（登出/注销/删记录/改密/换号/导入/换主题）只跳过去 + 高亮，绝不代点。
      识别失败一律静默：超时、低置信、JSON 坏都当没听懂，照常走问答。 */
   var ACTIONS = {
@@ -6002,20 +5999,14 @@ body.has-topbar{padding-top:44px}
       }
     }
     if (!el) el = document.querySelector(a.sel);
-    if (!el) {
-      showTopBar('这个页面现在没有可用的「' + a.name + '」');
-      return true;
-    }
+    if (!el) return true;   /* 页面上没有这个控件：静默，不打扰 */
 
     try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
     pulse(el);
 
-    if (a.danger) {
-      showTopBar('请你自己点一下「' + a.name + '」');
-      return true;
-    }
+    /* 危险动作只带到位置并高亮，绝不代点 */
+    if (a.danger) return true;
     el.click();
-    showTopBar('已打开「' + a.name + '」', function () { go('ask'); });
     return true;
   }
 
@@ -6023,32 +6014,6 @@ body.has-topbar{padding-top:44px}
     if (!el || !el.classList) return;
     el.classList.add('is-pulse');
     setTimeout(function () { el.classList.remove('is-pulse'); }, 3200);
-  }
-
-  var NL_TOPBAR_TIMER = null;
-  function hideTopBar() {
-    if (NL_TOPBAR_TIMER) { clearTimeout(NL_TOPBAR_TIMER); NL_TOPBAR_TIMER = null; }
-    var old = document.querySelector('.nl-topbar');
-    if (old && old.parentNode) old.parentNode.removeChild(old);
-    document.body.classList.remove('has-topbar');
-  }
-
-  function showTopBar(text, undo) {
-    hideTopBar();
-    var bar = document.createElement('div');
-    bar.className = 'nl-topbar';
-    bar.innerHTML = '<span>' + esc(text) + '</span>' +
-      (undo ? '<button class="nl-topbar__undo" type="button">撤销</button>' : '');
-    document.body.appendChild(bar);
-    document.body.classList.add('has-topbar');
-    if (undo) {
-      bar.querySelector('.nl-topbar__undo').addEventListener('click', function () {
-        hideTopBar();
-        undo();
-      });
-    }
-    requestAnimationFrame(function () { bar.classList.add('is-on'); });
-    NL_TOPBAR_TIMER = setTimeout(hideTopBar, 8000);
   }
 
   function stashIntent(id, recordId) {
