@@ -6115,7 +6115,10 @@ body[data-view="ask"] #app{height:100dvh}
 
   /* 档案里存的是整句（"青霉素过敏"、"青霉素、磺胺过敏"），要拆开并剥掉后缀才能比对 */
   function algNorm(raw) {
-    return clean(raw).replace(/(?:过敏|不耐受)$/, '').trim();
+    var t = clean(raw).replace(/(?:过敏|不耐受)$/, '').trim();
+    /* 手动录入时有人会写「没有过敏」「未发现」：这些不是过敏原，
+       否则首页会出现「你对 没有 过敏」这种句子 */
+    return /^(?:无|没有|没|未|否认|不|暂无|未见|不详)/.test(t) ? '' : t;
   }
 
   function algGroupOf(term) {
