@@ -1187,6 +1187,16 @@ body[data-view="ask"] #app{height:100dvh}
   *,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
   .thread{scroll-behavior:auto}
 }
+
+/* ——————————— 自然语言唤起：确认按钮 / 顶部横条 / 高亮 ——————————— */
+.act-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.act-list{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:10px}
+.nl-topbar{position:fixed;left:0;right:0;top:0;height:44px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 16px;background:var(--ink);color:var(--paper);font-size:13px;z-index:80;transform:translateY(-100%);transition:transform .18s ease}
+.nl-topbar.is-on{transform:translateY(0)}
+body.has-topbar{padding-top:44px}
+.nl-topbar__undo{background:none;border:1px solid var(--paper);color:var(--paper);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer}
+.is-pulse{animation:nl-pulse 1s ease-in-out 3;outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+@keyframes nl-pulse{0%,100%{box-shadow:0 0 0 0 rgba(166,52,31,0)}50%{box-shadow:0 0 0 6px rgba(166,52,31,.28)}}
 </style>
 </head>
 <body>
@@ -2220,6 +2230,7 @@ body[data-view="ask"] #app{height:100dvh}
     draft: null,         // 本次还未归档的记录
     chatReady: false,
     chatLog: [],         // 最近 10 轮对话：只给服务端消解指代，不作为事实来源
+    nlActionOn: false,   // 服务端是否开启「一句话唤起」
     busy: false,
     cloud: false,        // 是否已连上服务端
     saving: false,       // 归档 / 修改请求进行中
@@ -2943,6 +2954,7 @@ body[data-view="ask"] #app{height:100dvh}
           state.aiOn = !!(s && s.enabled);
           state.aiText = (s && s.text_model) || '';
           state.aiVision = (s && s.vision_model) || '';
+          state.nlActionOn = !!(s && s.nl_action);
                 if (state.view === 'scan') renderScan();
         })
         .catch(function () {
@@ -2967,6 +2979,7 @@ body[data-view="ask"] #app{height:100dvh}
       apiFetch('/api/records')
         .then(function (list) {
           state.records = (list || []).map(mapRecord);
+          resumeIntent();
           syncIdentity();
           renderHome();
           renderWork();
@@ -2981,6 +2994,7 @@ body[data-view="ask"] #app{height:100dvh}
     if (!state.profile.name) state.profile.name = name;
     if (!existed) write(LS.user(), state.profile);
     state.records = read(LS.records(), []);
+    resumeIntent();
     if (!Array.isArray(state.records)) state.records = [];
 
     $('#gate').hidden = true;
@@ -5784,76 +5798,275 @@ body[data-view="ask"] #app{height:100dvh}
     ], [], false);
   }
 
-  /* ————————————————— 询问页 · 自然语言跳转 —————————————————
-     说「拍照识药」「打开日历」「导出档案」这类话，不占模型、不查档案，
-     直接把用户带到对应页面并触发那个功能。
+  /* ————————————————— 询问页 · 自然语言唤起 —————————————————
+     说一句话 → 先问「要打开××吗？」→ 用户点「打开」才跳过去并执行。
+     危险动作（登出/注销/删记录/改密/换号/导入/换主题）只跳过去 + 高亮，绝不代点。
+     识别失败一律静默：超时、低置信、JSON 坏都当没听懂，照常走问答。 */
+  var ACTIONS = {
+    scan_camera:     { name: '拍照识药', view: 'scan', sel: '#camBtn', needLogin: false, danger: false },
+    scan_album:      { name: '从相册选药', view: 'scan', sel: '#pickBtn', needLogin: false, danger: false },
+    record_start:    { name: '开始录音', view: 'work', sel: '#startBtn', needLogin: true, danger: false },
+    record_rec:      { name: '继续录音', view: 'work', sel: '#recBtn', needLogin: true, danger: false },
+    record_read:     { name: '朗读这段文字', view: 'work', sel: '#spkBtn', needLogin: true, danger: false },
+    geo_hospital:    { name: '定位当前医院', view: 'home', sel: '#geoBtn', needLogin: true, danger: false },
+    calendar_add:    { name: '加入日历', view: 'work', act: 'cal', needLogin: true, danger: false, needsRecord: true },
+    record_edit:     { name: '编辑记录', view: 'work', act: 'edit', needLogin: true, danger: false, needsRecord: true },
+    record_delete:   { name: '删除记录', view: 'work', act: 'del', needLogin: true, danger: true, needsRecord: true },
+    avatar_change:   { name: '换头像', view: 'mine', sel: '#avaBtn', needLogin: true, danger: false, acct: true },
+    password_change: { name: '改密码', view: 'mine', sel: '#pwdBtn', needLogin: true, danger: true, acct: true },
+    phone_change:    { name: '换手机号', view: 'mine', sel: '#bindBtn', needLogin: true, danger: true, acct: true },
+    export_data:     { name: '导出备份', view: 'mine', sel: '#exportBtn', needLogin: true, danger: false },
+    import_data:     { name: '导入备份', view: 'mine', sel: '#importBtn', needLogin: true, danger: true },
+    print_pdf:       { name: '打印 / 存 PDF', view: 'mine', sel: '#printBtn', needLogin: true, danger: false },
+    theme_change:    { name: '换主题', view: 'mine', sel: '#themeSel', needLogin: false, danger: true },
+    logout:          { name: '退出登录', view: 'mine', sel: '#logoutBtn', needLogin: true, danger: true, acct: true },
+    account_delete:  { name: '注销账号', view: 'mine', sel: '#delAcctBtn', needLogin: true, danger: true, acct: true }
+  };
 
-     只认指令、不抢提问：带疑问词或长过 24 个字的，一律交回正常问答。
-     这一层只做跳转，不产生任何医疗结论。 */
-  var ASK_NAV = [
-    { w: ['拍照识药', '识药', '拍药', '扫描药盒', '认药'],
-      view: 'scan',
-      say: '好，带你去拍照识药。对准药盒或处方拍一张，我来认药名、剂量和用法。' },
-    { w: ['工作台', '开始录音', '录音页', '整理记录', '记录页'],
-      view: 'work',
-      say: '好，到工作台了。点右上「开始录音」，或者把问诊内容贴进「手动整理」。' },
-    { w: ['我的档案', '全部记录', '档案列表', '就诊记录', '我的', '档案'],
-      view: 'mine',
-      say: '好，到「我的」了。这里能翻全部档案、搜索、导出和打印。' },
-    { w: ['首页', '主页'], view: 'home', say: '好，回首页了。' },
-    { w: ['导出档案', '导出', '备份'],
-      view: 'mine', action: 'export',
-      say: '好，正在把档案导出成 JSON 备份。' },
-    { w: ['打印', '存pdf', '导出pdf'],
-      view: 'mine', action: 'print',
-      say: '好，打开打印预览，可以直接打印或存成 PDF。' },
-    { w: ['导入档案', '导入', '恢复档案'],
-      view: 'mine', action: 'import',
-      say: '好，打开导入，选之前导出的 JSON 文件就行。' },
-    { w: ['改密码', '修改密码', '账号安全', '注销账号'],
-      view: 'mine', action: 'account',
-      say: '好，到「我的」→「账号与安全」，改密码和注销都在这里。' },
-    { w: ['日历', '日程', '加到日历', '加进日历', '放进日历'],
-      action: 'calendar',
-      say: '好，我把最近一次的复诊和用药整理成日程文件。' }
+  /* 本地快判：只认很明确的说法，拿不准交给模型或正常问答 */
+  var LOCAL_RULES = [
+    [/相册/, 'scan_album'],
+    [/拍照|拍一张|拍张|拍一下|照一张|药盒|扫一下|扫一扫|认药|识药/, 'scan_camera'],
+    [/开始录音|录一次|录音记录|记一次问诊/, 'record_start'],
+    [/继续录音|重新录|再录一段/, 'record_rec'],
+    [/朗读|念一下|读一下/, 'record_read'],
+    [/定个?位|我在哪|哪个医院|医院门口/, 'geo_hospital'],
+    [/加.{0,4}日历|日历.{0,4}加|日程|复诊.{0,4}怕忘/, 'calendar_add'],
+    [/修改.{0,4}记录|编辑.{0,4}记录/, 'record_edit'],
+    [/删.{0,6}记录|记录.{0,6}删|删掉这条|删除这条|把.{0,10}删了/, 'record_delete'],
+    [/头像/, 'avatar_change'],
+    [/改密码|修改密码|密码.{0,4}改/, 'password_change'],
+    [/换.{0,4}手机号|改.{0,4}手机号|换绑/, 'phone_change'],
+    [/导出|备份档案/, 'export_data'],
+    [/导入|恢复档案/, 'import_data'],
+    [/打印|存.{0,2}pdf/i, 'print_pdf'],
+    [/换.{0,4}主题|主题.{0,4}换|换.{0,4}颜色/, 'theme_change'],
+    [/退出登录|退出账号|登出/, 'logout'],
+    [/注销|删号/, 'account_delete']
   ];
 
-  function askNav(text) {
-    /* 去掉标点空白并转小写，让「存 PDF」和「存pdf」都能认 */
-    var t = String(text || '').replace(/[\s，。！？、；：,.!?;:~～…\-—_()（）「」]/g, '').toLowerCase();
-    if (!t || t.length > 24) return null;
-    /* 疑问句交给问答：宁可少跳一次，也不能把「我几点吃药」当成指令 */
-    if (/什么|哪|几|多少|吗|呢|是不是|有没有|怎么|为什么|如何|咋|时候|能不能|可不可以/.test(t)) return null;
-    var VERB = /打开|进入|跳转|切换|带我去|帮我|我要|我想|开始|去|用|来|看一下|看看/;
-    for (var i = 0; i < ASK_NAV.length; i++) {
-      var it = ASK_NAV[i];
-      for (var j = 0; j < it.w.length; j++) {
-        var w = it.w[j];
-        if (t === w) return it;
-        if (t.indexOf(w) >= 0 && VERB.test(t)) return it;
-      }
+  var PENDING = null;
+  var NL_SAY_MAX = 24;
+
+  function nlFlat(text) {
+    return String(text || '').replace(/[\s，。！？、；：,.!?;:~～…\-—_()（）「」]/g, '').toLowerCase();
+  }
+
+  function detectActionLocal(q) {
+    var t = nlFlat(q);
+    if (!t || t.length > 30) return null;
+    /* 只说「打开」：不知道打开哪个，反问问一句 */
+    if (/^(打开|打开吧|帮我打开|开始|用一下)$/.test(t)) return '__which__';
+    /* 问「在哪 / 怎么用 / 什么意思」是提问，不是让你现在打开 */
+    if (/什么|哪|怎么|为什么|如何|意思|在哪|是不是|吗|呢/.test(t)) return null;
+    for (var i = 0; i < LOCAL_RULES.length; i++) {
+      if (LOCAL_RULES[i][0].test(t)) return LOCAL_RULES[i][1];
     }
     return null;
   }
 
-  function runAskNav(it) {
-    if (it.view) go(it.view);
-    /* 等目标页渲染完再触发按钮，否则可能点空 */
-    setTimeout(function () {
-      if (it.action === 'export' && $('#exportBtn')) { $('#exportBtn').click(); return; }
-      if (it.action === 'print' && $('#printBtn')) { $('#printBtn').click(); return; }
-      if (it.action === 'import' && $('#importBtn')) { $('#importBtn').click(); return; }
-      if (it.action === 'account') {
-        var box = $('#acctBox');
-        if (box) { box.open = true; box.scrollIntoView({ block: 'center' }); }
-        return;
+  /* 关键词没命中时的粗筛：明显是查档案/求建议的句子不送模型，省一次等待 */
+  function actionPrefilter(q) {
+    if (!state.nlActionOn) return false;
+    var t = String(q || '').trim();
+    if (!t || t.length > 30) return false;
+    if (/上次|上回|最近一次|开了什么|吃的什么|过敏|几次|什么时候|还剩|要不要|能不能|是不是|有没有|多久|什么意思|怎么用|在哪/.test(t)) return false;
+    return /药|拍|照|相册|录|定个?位|医院|日历|日程|复诊|提醒|记一下|头像|密码|手机号|导出|导入|打印|pdf|主题|颜色|退出|登出|注销|删|编辑|修改|朗读|念|备份/i.test(t);
+  }
+
+  function detectActionRemote(q, history, done) {
+    if (!API.on || !state.nlActionOn) { done(null); return; }
+    apiFetch('/api/ai/action', {
+      method: 'POST',
+      body: { question: q, history: (history || []).slice(-6) },
+      timeoutMs: 4000
+    }).then(function (r) {
+      done(r && r.action ? r : null);
+    }).catch(function () {
+      done(null);   /* 失败必须静默 */
+    });
+  }
+
+  function isYes(q) {
+    var t = nlFlat(q);
+    return /^(是|好|好的|行|可以|要|对|嗯|麻烦你|帮我打开|打开吧|ok|okay)$/.test(t);
+  }
+
+  function isNo(q) {
+    var t = nlFlat(q);
+    return /^(不|不用|不要|先不|取消|别|等会儿|不需要|算了)(了|啦)?$/.test(t);
+  }
+
+  function askConfirm(id, recordId, say) {
+    var a = ACTIONS[id];
+    if (!a) return false;
+    var text = String(say || '').replace(/\s+/g, '').slice(0, NL_SAY_MAX);
+    if (!text) text = '要打开「' + a.name + '」吗？' + (a.danger ? '这一步需要你自己点。' : '');
+    var el = document.createElement('div');
+    el.className = 'msg msg--bot';
+    el.innerHTML = '<div class="msg__who">小鹿</div><div class="msg__body"><p>' + esc(text) + '</p>' +
+      '<div class="act-row">' +
+        '<button class="btn btn--primary btn--mini" type="button" data-yes>打开</button>' +
+        '<button class="btn btn--ghost btn--mini" type="button" data-no>不用了</button>' +
+      '</div></div>';
+    $('#thread').appendChild(el);
+    scrollThread();
+    PENDING = { id: id, recordId: recordId || '', el: el };
+    remember('assistant', text);
+    el.querySelector('[data-yes]').addEventListener('click', confirmPending);
+    el.querySelector('[data-no]').addEventListener('click', function () { cancelPending(true); });
+    return true;
+  }
+
+  function lockBubble(el, note) {
+    if (!el) return;
+    var row = el.querySelector('.act-row');
+    if (row) row.parentNode.replaceChild(document.createElement('div'), row);
+    if (note) {
+      var p = document.createElement('p');
+      p.className = 'meta';
+      p.textContent = note;
+      el.querySelector('.msg__body').appendChild(p);
+    }
+  }
+
+  function confirmPending() {
+    if (!PENDING) return;
+    var p = PENDING;
+    PENDING = null;
+    lockBubble(p.el, '好，这就去。');
+    if (ACTIONS[p.id] && ACTIONS[p.id].needsRecord && !p.recordId) {
+      askWhichRecord(p.id);
+      return;
+    }
+    runAction(p.id, p.recordId);
+  }
+
+  function cancelPending(ack) {
+    var p = PENDING;
+    PENDING = null;
+    if (p) lockBubble(p.el, ack ? '好，先不打开。' : '');
+    if (ack) {
+      var input = $('#askInput');
+      if (input) input.focus();
+    }
+  }
+
+  function askWhichRecord(id) {
+    var rows = sortedDesc().slice(0, 3);
+    if (!rows.length) {
+      addBot([P('档案里还没有记录。先去「记录」里整理一份，再来操作。')], [], false);
+      return;
+    }
+    var el = document.createElement('div');
+    el.className = 'msg msg--bot';
+    var html = '<div class="msg__who">小鹿</div><div class="msg__body"><p>你要操作哪一次？</p>' +
+      '<div class="act-list">';
+    rows.forEach(function (r) {
+      html += '<button class="btn btn--ghost btn--mini" type="button" data-rec="' + esc(r.id) + '">' +
+        esc(fmtDate(r.at)) + ' · ' + esc(r.hospital || '未记录医院') + '</button>';
+    });
+    el.innerHTML = html + '</div></div>';
+    $('#thread').appendChild(el);
+    scrollThread();
+    $$('[data-rec]', el).forEach(function (b) {
+      b.addEventListener('click', function () {
+        $$('button', el).forEach(function (x) { x.disabled = true; });
+        runAction(id, b.getAttribute('data-rec'));
+      });
+    });
+  }
+
+  function runAction(id, recordId) {
+    var a = ACTIONS[id];
+    if (!a) return false;
+    if (a.needLogin && !state.user) {
+      stashIntent(id, recordId);
+      toast('先登录一下，登录后我接着帮你。');
+      return true;
+    }
+
+    go(a.view);
+    if (a.acct) {
+      var box = $('#acctBox');
+      if (box) box.open = true;
+    }
+
+    var el = null;
+    if (a.needsRecord && recordId) {
+      var li = document.querySelector('#timeline li[data-id="' + recordId + '"]');
+      if (li) {
+        var toggle = li.querySelector('.tl');
+        if (toggle && toggle.getAttribute('aria-expanded') === 'false') toggle.click();
+        el = li.querySelector('[data-act="' + a.act + '"]');
       }
-      if (it.action === 'calendar') {
-        var list = sortedDesc();
-        if (!list.length) { toast('还没有档案。先在「记录」里整理一份，再来加日历。'); return; }
-        addRecordToCalendar(list[0].id);
-      }
-    }, it.view ? 260 : 0);
+    }
+    if (!el) el = document.querySelector(a.sel);
+    if (!el) {
+      showTopBar('这个页面现在没有可用的「' + a.name + '」');
+      return true;
+    }
+
+    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+    pulse(el);
+
+    if (a.danger) {
+      showTopBar('请你自己点一下「' + a.name + '」');
+      return true;
+    }
+    el.click();
+    showTopBar('已打开「' + a.name + '」', function () { go('ask'); });
+    return true;
+  }
+
+  function pulse(el) {
+    if (!el || !el.classList) return;
+    el.classList.add('is-pulse');
+    setTimeout(function () { el.classList.remove('is-pulse'); }, 3200);
+  }
+
+  var NL_TOPBAR_TIMER = null;
+  function hideTopBar() {
+    if (NL_TOPBAR_TIMER) { clearTimeout(NL_TOPBAR_TIMER); NL_TOPBAR_TIMER = null; }
+    var old = document.querySelector('.nl-topbar');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    document.body.classList.remove('has-topbar');
+  }
+
+  function showTopBar(text, undo) {
+    hideTopBar();
+    var bar = document.createElement('div');
+    bar.className = 'nl-topbar';
+    bar.innerHTML = '<span>' + esc(text) + '</span>' +
+      (undo ? '<button class="nl-topbar__undo" type="button">撤销</button>' : '');
+    document.body.appendChild(bar);
+    document.body.classList.add('has-topbar');
+    if (undo) {
+      bar.querySelector('.nl-topbar__undo').addEventListener('click', function () {
+        hideTopBar();
+        undo();
+      });
+    }
+    requestAnimationFrame(function () { bar.classList.add('is-on'); });
+    NL_TOPBAR_TIMER = setTimeout(hideTopBar, 8000);
+  }
+
+  function stashIntent(id, recordId) {
+    try {
+      sessionStorage.setItem('lx_nl_intent', JSON.stringify({ id: id, recordId: recordId || '', at: Date.now() }));
+    } catch (e) {}
+  }
+
+  function resumeIntent() {
+    var raw = null;
+    try { raw = sessionStorage.getItem('lx_nl_intent'); } catch (e) { return; }
+    if (!raw) return;
+    try { sessionStorage.removeItem('lx_nl_intent'); } catch (e) {}
+    var it = null;
+    try { it = JSON.parse(raw); } catch (e) { return; }
+    if (!it || !ACTIONS[it.id]) return;
+    if (Date.now() - (it.at || 0) > 5 * 60 * 1000) return;
+    setTimeout(function () { runAction(it.id, it.recordId); }, 500);
   }
 
   function send() {
@@ -5861,6 +6074,21 @@ body[data-view="ask"] #app{height:100dvh}
     var q = input.value.trim();
     if (!q) { input.focus(); return; }
     if (state.busy) { toast('上一条还在答，稍等一下再发。'); return; }
+
+    /* 有等待确认的动作：先看这句是「是」还是「不」 */
+    if (PENDING) {
+      if (isYes(q)) {
+        addUser(q); remember('user', q); input.value = ''; autoGrow();
+        confirmPending();
+        return;
+      }
+      if (isNo(q)) {
+        addUser(q); remember('user', q); input.value = ''; autoGrow();
+        cancelPending(true);
+        return;
+      }
+      cancelPending(false);   /* 换了话题：收起气泡，照常提问 */
+    }
 
     /* 只带最近 10 轮，且先取再入栈：当前这句由 question 单独传 */
     var history = state.chatLog.slice(-20);
@@ -5870,15 +6098,36 @@ body[data-view="ask"] #app{height:100dvh}
     input.value = '';
     autoGrow();
 
-    /* 先看这句是不是「带我去做某件事」：是就直接跳过去，不进问答、不占模型 */
-    var nav = askNav(q);
-    if (nav) {
-      addBot([P(esc(nav.say))], [], false);
-      remember('assistant', nav.say);
-      runAskNav(nav);
+    /* ① 本地关键词快判：不占模型；开关关掉时整层不生效 */
+    var actId = state.nlActionOn ? detectActionLocal(q) : null;
+    if (actId === '__which__') {
+      addBot([P('要打开哪个？拍照识药、定位医院、加日历、换主题，说一个就行。')], [], false);
+      return;
+    }
+    if (actId) { askConfirm(actId); return; }
+
+    /* ② 像是要用功能但说不准：问一句模型，超时或低置信就当没听懂 */
+    if (state.nlActionOn && actionPrefilter(q)) {
+      state.busy = true;
+      var probe = document.createElement('div');
+      probe.className = 'msg msg--bot';
+      probe.innerHTML = '<div class="msg__who"><span class="dot"></span>小鹿</div>' +
+        '<div class="msg__body"><span class="typing"><i></i><i></i><i></i></span></div>';
+      $('#thread').appendChild(probe);
+      scrollThread();
+      detectActionRemote(q, history, function (res) {
+        state.busy = false;
+        probe.remove();
+        if (res && res.action) askConfirm(res.action, '', res.say);
+        else askServer(q, history);
+      });
       return;
     }
 
+    askServer(q, history);
+  }
+
+  function askServer(q, history) {
     state.busy = true;
 
     var holder = document.createElement('div');
