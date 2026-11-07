@@ -128,6 +128,13 @@ class Record(Base):
     uncertain: Mapped[list] = mapped_column(JSON, default=list)
     mode: Mapped[str] = mapped_column(String(16), default="manual")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # 软删除时间：非空表示在「最近删除」里，可以恢复。
+    # 只保留最近 5 份（超出时真删最旧的一份），避免回收站无限膨胀。
+    # 不加单列索引：查询已带 user_id（有索引），旧库补列时也不会多出一个索引，
+    # 新库与老库结构才能保持一致。
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
 
 
 class Run(Base):
