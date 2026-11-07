@@ -213,6 +213,18 @@ class RecordOut(BaseModel):
     created_at: datetime
 
 
+class DeletedRecordOut(BaseModel):
+    """回收站条目：只带列表要显示的信息，不回传完整转写。"""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    visit_at: datetime
+    hospital: str
+    summary: str
+    med_count: int = 0
+    deleted_at: datetime
+
+
 class ExtractIn(BaseModel):
     text: str = Field(min_length=1, max_length=20000)
 

@@ -187,14 +187,36 @@ def delete_user_account(db: Session, user_id: str) -> dict[str, int]:
 
 
 # ————————————————— 就诊记录 —————————————————
+TRASH_KEEP = 5   # 「最近删除」只保留 5 份，超出真删最旧的
+
+
 def list_records(db: Session, user_id: str) -> list[Record]:
-    stmt = select(Record).where(Record.user_id == user_id).order_by(Record.visit_at.desc())
+    """在用档案：软删除的不出现在这里。"""
+    stmt = (
+        select(Record)
+        .where(Record.user_id == user_id, Record.deleted_at.is_(None))
+        .order_by(Record.visit_at.desc())
+    )
     return list(db.scalars(stmt))
 
 
-def get_record(db: Session, user_id: str, record_id: str) -> Record | None:
+def get_record(db: Session, user_id: str, record_id: str,
+               include_deleted: bool = False) -> Record | None:
     stmt = select(Record).where(Record.id == record_id, Record.user_id == user_id)
+    if not include_deleted:
+        stmt = stmt.where(Record.deleted_at.is_(None))
     return db.scalar(stmt)
+
+
+def list_deleted_records(db: Session, user_id: str, limit: int = TRASH_KEEP) -> list[Record]:
+    """最近删除，按删除时间倒序。"""
+    stmt = (
+        select(Record)
+        .where(Record.user_id == user_id, Record.deleted_at.is_not(None))
+        .order_by(Record.deleted_at.desc())
+        .limit(limit)
+    )
+    return list(db.scalars(stmt))
 
 
 def create_record(db: Session, user_id: str, data: dict) -> tuple[Record, bool]:
@@ -205,6 +227,11 @@ def create_record(db: Session, user_id: str, data: dict) -> tuple[Record, bool]:
             select(Record).where(Record.user_id == user_id, Record.client_id == client_id)
         )
         if existing:
+            # 同一条记录此前被删过：再提交等于恢复，别让它「存了但看不见」
+            if existing.deleted_at is not None:
+                existing.deleted_at = None
+                db.commit()
+                db.refresh(existing)
             return existing, False
 
     record = Record(user_id=user_id, **data)
@@ -224,12 +251,35 @@ def create_record(db: Session, user_id: str, data: dict) -> tuple[Record, bool]:
 
 
 def delete_record(db: Session, user_id: str, record_id: str) -> bool:
+    """软删除：进回收站，超出 5 份才真删最旧的那条。"""
     record = get_record(db, user_id, record_id)
     if not record:
         return False
-    db.delete(record)
+    record.deleted_at = datetime.now(UTC)
+    db.flush()
+
+    # 只留最近 TRASH_KEEP 份：多出来的硬删，避免存储与隐私风险累积
+    extra = db.scalars(
+        select(Record)
+        .where(Record.user_id == user_id, Record.deleted_at.is_not(None))
+        .order_by(Record.deleted_at.desc())
+        .offset(TRASH_KEEP)
+    ).all()
+    for old in extra:
+        db.delete(old)
     db.commit()
     return True
+
+
+def restore_record(db: Session, user_id: str, record_id: str) -> Record | None:
+    """从回收站恢复。记录不在回收站里（或不属于本人）返回 None。"""
+    record = get_record(db, user_id, record_id, include_deleted=True)
+    if not record or record.deleted_at is None:
+        return None
+    record.deleted_at = None
+    db.commit()
+    db.refresh(record)
+    return record
 
 
 # ————————————————— 运行记录 —————————————————

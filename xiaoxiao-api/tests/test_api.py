@@ -1350,3 +1350,86 @@ def test_action_endpoint_is_silent_when_off(client, fresh_headers):
     assert body == {"action": None, "confidence": 0.0, "say": ""}
     status = client.get("/api/ai/status", headers=fresh_headers).json()
     assert status["nl_action"] is False
+
+
+# ————————————————— 最近删除与恢复 —————————————————
+def _mk(client, headers, client_id):
+    r = _new_record(client, headers, client_id)
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def test_delete_goes_to_trash_and_restores(client, fresh_headers):
+    rid = _mk(client, fresh_headers, "v_trash_001")
+
+    assert client.delete(f"/api/records/{rid}", headers=fresh_headers).status_code == 204
+    # 在用列表里看不到，也不允许按 id 直接读
+    assert client.get("/api/records", headers=fresh_headers).json() == []
+    assert client.get(f"/api/records/{rid}", headers=fresh_headers).status_code == 404
+
+    trash = client.get("/api/records/deleted", headers=fresh_headers).json()
+    assert [x["id"] for x in trash] == [rid]
+    assert trash[0]["hospital"] == "市第一人民医院"
+    assert trash[0]["med_count"] == 2
+
+    assert client.post(f"/api/records/{rid}/restore", headers=fresh_headers).status_code == 200
+    assert [r["id"] for r in client.get("/api/records", headers=fresh_headers).json()] == [rid]
+    assert client.get("/api/records/deleted", headers=fresh_headers).json() == []
+    # 恢复后可以正常读到完整内容
+    assert client.get(f"/api/records/{rid}", headers=fresh_headers).status_code == 200
+
+
+def test_trash_keeps_only_latest_five(client, fresh_headers):
+    ids = [_mk(client, fresh_headers, f"v_trash5_{i}") for i in range(7)]
+    for rid in ids:
+        assert client.delete(f"/api/records/{rid}", headers=fresh_headers).status_code == 204
+
+    trash = client.get("/api/records/deleted", headers=fresh_headers).json()
+    assert len(trash) == 5, "只保留最近 5 份"
+    kept = [x["id"] for x in trash]
+    assert kept == list(reversed(ids[2:])), "最近删的在前"
+    # 超出 5 份的两条已经被真删，恢复不了
+    assert client.post(f"/api/records/{ids[0]}/restore", headers=fresh_headers).status_code == 404
+    assert client.post(f"/api/records/{ids[1]}/restore", headers=fresh_headers).status_code == 404
+
+
+def _fresh_account(client):
+    """自带一个干净账号：会话级夹具会被别的用例改密码/登出，这里不复用。"""
+    phone = "139" + f"{uuid.uuid4().int % 10**8:08d}"
+    r = client.post("/api/auth/register", json={
+        "username": "回收" + uuid.uuid4().hex[:6], "phone": phone, "password": "pass12345",
+    })
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def test_trash_is_scoped_to_owner(client):
+    owner = _fresh_account(client)
+    other = _fresh_account(client)
+
+    rid = _mk(client, owner, "v_trash_iso_001")
+    assert client.delete(f"/api/records/{rid}", headers=owner).status_code == 204
+
+    assert client.get("/api/records/deleted", headers=other).json() == []
+    assert client.post(f"/api/records/{rid}/restore", headers=other).status_code == 404
+    # 他人恢复失败后，本人仍在回收站里
+    assert [x["id"] for x in client.get("/api/records/deleted", headers=owner).json()] == [rid]
+
+
+def test_restore_is_not_idempotent_but_safe(client, fresh_headers):
+    rid = _mk(client, fresh_headers, "v_trash_twice")
+    client.delete(f"/api/records/{rid}", headers=fresh_headers)
+    assert client.post(f"/api/records/{rid}/restore", headers=fresh_headers).status_code == 200
+    # 已经在用的记录再恢复一次：没有可恢复的东西，返回 404 而不是重复插入
+    assert client.post(f"/api/records/{rid}/restore", headers=fresh_headers).status_code == 404
+    assert len(client.get("/api/records", headers=fresh_headers).json()) == 1
+
+
+def test_resubmit_same_client_id_after_delete_restores(client, fresh_headers):
+    """删除后又提交同一 client_id：不能「存成功但看不见」。"""
+    rid = _mk(client, fresh_headers, "v_trash_resend")
+    client.delete(f"/api/records/{rid}", headers=fresh_headers)
+    again = _new_record(client, fresh_headers, "v_trash_resend")
+    assert again.status_code == 201
+    assert again.json()["id"] == rid
+    assert [r["id"] for r in client.get("/api/records", headers=fresh_headers).json()] == [rid]
