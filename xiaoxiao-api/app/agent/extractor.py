@@ -34,7 +34,10 @@ _COMMON_RE = "|".join(sorted(COMMON_DRUGS, key=len, reverse=True))
 MED_RE = re.compile(r"([\u4e00-\u9fa5A-Za-z]{2,14}" + MED_SUFFIX + r"|" + _COMMON_RE + r")")
 
 # 明确否定：said 之后出现的药不吃
-NEG_MED = re.compile(r"(?:不用|不要|不必|不能|别再|停了|停用|已经停|不需要)(?:再)?(?:吃|用|服用|服)?")
+NEG_MED = re.compile(
+    r"(?:不用|不要|不必|不能|别再|停了|停用|已经停|不需要)(?:再)?(?:吃|用|服用|服)?"
+    r"|(?<![人区个特级类分性差告离])别(?:再)?(?:吃|用|服用|服)"
+)
 DENY_ALLERGY = re.compile(r"(?:没有|没|无|否认|不|未)[^。；;]{0,6}(?:过敏|不耐受)")
 
 # 疾病名（含常见慢病与「××炎/病/症」构词）

@@ -48,13 +48,13 @@ def scores():
 
 
 def test_name_extraction_does_not_regress(scores):
-    # 当前 0.862，护栏留出余量，只拦明显回退
+    # 当前 0.877，护栏留出余量，只拦明显回退
     assert scores["f1"] >= 0.80, f"药名 F1 回退到 {scores['f1']:.3f}"
     assert scores["precision"] >= 0.90, f"药名 P 回退到 {scores['precision']:.3f}"
 
 
 def test_fatal_errors_stay_low(scores):
-    # 现状 2 处，都出在 D25「二甲双胍先别吃了」：否定词表里没有「别吃了」，
-    # 这属于规则层遗留（词典救不了），修的时候把这条断言收紧到 0。
-    assert scores["fatal"] <= 2, f"不可容忍错误升到 {scores['fatal']} 处"
-    assert scores["fatal_stopped"] <= 1, "停用混入变多了"
+    # 曾固定为 2 处，都是 D25「二甲双胍先别吃了」被判成在用药。
+    # 否定词补上「别吃 / 别用」后归零，护栏随之收紧到 0：再冒出一处就算回退。
+    assert scores["fatal"] == 0, f"不可容忍错误升到 {scores['fatal']} 处"
+    assert scores["fatal_stopped"] == 0, "停用混入变多了"

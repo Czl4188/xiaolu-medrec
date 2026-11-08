@@ -65,3 +65,17 @@ def test_old_name_resolves_to_aspirin():
     data = extract("开了乙酰水杨酸片100mg每天一次。")
     names = [m["name"] for m in data["meds"]]
     assert names == ["阿司匹林"], f"旧称没换成通用名：{names}"
+
+def test_oral_stop_phrase_moves_drug_to_discontinued():
+    # 「先别吃了」以前不认，停用药会留在在用清单里
+    data = extract("二甲双胍先别吃了，换成达美康 30 毫克，一天一次。")
+    assert [m["name"] for m in data["meds"]] == ["格列美脲"]
+    assert "二甲双胍" in (data.get("discontinued") or [])
+
+
+def test_bie_ren_is_not_a_stop_phrase():
+    # 「别人说 / 别人用了」是转述，不是让自己停药
+    for text in ("别人说阿莫西林好用，我就买了。", "别人用了阿莫西林，我也想试试。"):
+        data = extract(text)
+        assert [m["name"] for m in data["meds"]] == ["阿莫西林"], text
+        assert not (data.get("discontinued") or []), text
