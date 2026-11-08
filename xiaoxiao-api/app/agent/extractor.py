@@ -12,6 +12,8 @@
 import re
 from datetime import UTC, datetime
 
+from app.agent import kb as drug_kb
+
 MED_SUFFIX = "(?:片|胶囊|颗粒|口服液|糖浆|软膏|乳膏|滴眼液|喷雾剂|注射液|散|丸|凝胶|贴)"
 
 # 真实问诊里医生经常只说药名、不带剂型（「阿莫西林 0.5g」）。
@@ -147,20 +149,34 @@ def _parse_med_window(window: str, before: str = "") -> dict:
     }
 
 
+def canonical(hit) -> str:
+    """命中词的对外药名。
+
+    商品名/旧称换成通用名（波立维 → 氯吡格雷）；
+    本来就是通用名时保留原文粒度（「奥美拉唑肠溶胶囊」不缩成「奥美拉唑」）。
+    """
+    if drug_kb.is_alias(getattr(hit, "key", "")):
+        return hit.entry.generic
+    return strip_med(hit.group(1))
+
+
 def _extract_meds(sentences: list[str]) -> tuple[list[dict], list[str]]:
     """以药名为锚点切窗，逐药独立解析；否定的药进 discontinued。"""
     meds: list[dict] = []
     discontinued: list[str] = []
     seen: set[str] = set()
-    med_re = re.compile(r"([\u4e00-\u9fa5A-Za-z]{2,14}" + MED_SUFFIX + ")")
 
     for sentence in sentences:
-        hits = [m for m in MED_RE.finditer(sentence)]
+        # 词典优先（含商品名与别名），词典没命中的句子再退回旧的规则匹配
+        hits = drug_kb.scan(sentence) or list(MED_RE.finditer(sentence))
         if not hits:
             continue
         for idx, hit in enumerate(hits):
             raw_name = hit.group(1)
-            name = strip_med(raw_name)
+            after = sentence[hit.end():hit.end() + 4]
+            if after.startswith(("过敏", "不耐受")):
+                continue  # 「青霉素过敏」里的青霉素是过敏原，不是服用的药
+            name = canonical(hit)
             if not name or len(name) < 2 or name in seen or NOT_DRUG.match(name):
                 continue
 
@@ -193,7 +209,7 @@ def _extract_meds(sentences: list[str]) -> tuple[list[dict], list[str]]:
             value = cn_num(tail_days.group(1))
             if value:
                 for med in meds:
-                    if med["name"] in {strip_med(h.group(1)) for h in hits} and not med["days"]:
+                    if med["name"] in {canonical(h) for h in hits} and not med["days"]:
                         med["days"] = value
 
     return meds, discontinued
