@@ -41,6 +41,8 @@ Thumbs.db
 # ————— 临时测试探针 —————
 xiaoxiao-ai/_*.html
 xiaoxiao-api/web/_*.html
+# 难例集评测的产物（可随时用 scripts/eval_drug_extract.py 重跑）
+eval_out/
 
 # 微信开发者工具的个人本地配置
 xiaolu-miniprogram/project.private.config.json
