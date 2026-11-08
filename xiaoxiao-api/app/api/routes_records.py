@@ -10,7 +10,14 @@ from app.api.deps import current_user, rate_limit
 from app.db import repo
 from app.db.models import Record, User
 from app.db.session import get_db
-from app.schemas import ExtractIn, ExtractOut, RecordIn, RecordOut, RecordPatch
+from app.schemas import (
+    DeletedRecordOut,
+    ExtractIn,
+    ExtractOut,
+    RecordIn,
+    RecordOut,
+    RecordPatch,
+)
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 
@@ -61,6 +68,39 @@ def create_record(
     return _to_out(record)
 
 
+@router.get("/deleted", response_model=list[DeletedRecordOut])
+def list_deleted(
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> list[DeletedRecordOut]:
+    """最近删除的档案（最多 5 份）。必须在 /{record_id} 之前声明，否则会被当成 id。"""
+    return [
+        DeletedRecordOut(
+            id=r.id,
+            visit_at=r.visit_at,
+            hospital=r.hospital,
+            summary=r.summary,
+            med_count=len(r.meds or []),
+            deleted_at=r.deleted_at,
+        )
+        for r in repo.list_deleted_records(db, user.id)
+        if r.deleted_at is not None
+    ]
+
+
+@router.post("/{record_id}/restore", response_model=RecordOut)
+def restore_record(
+    record_id: str,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> RecordOut:
+    """把一份删除过的档案恢复到在用列表。"""
+    record = repo.restore_record(db, user.id, record_id)
+    if not record:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "这份记录不在可恢复范围内")
+    return _to_out(record)
+
+
 @router.get("/{record_id}", response_model=RecordOut)
 def get_record(
     record_id: str,
@@ -102,6 +142,7 @@ def delete_record(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> None:
+    """软删除：进「最近删除」，可在 5 份之内恢复；超出才真删最旧的那条。"""
     if not repo.delete_record(db, user.id, record_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "记录不存在")
 

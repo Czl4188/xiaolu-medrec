@@ -804,12 +804,20 @@ body[data-view="ask"] #app{height:100dvh}
 .chip:hover{border-color:var(--ink);color:var(--ink);background:var(--paper-2)}
 .chip:active{transform:scale(.98)}
 .composer__row{display:flex;gap:9px;align-items:flex-end;min-width:0}
+/* 输入框固定两行高：空着时提示语整块居中，字多了在框内滚动 */
+.composer__field{position:relative;flex:1;min-width:0;display:flex}
+.composer__ph{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  padding:0 13px;text-align:center;color:var(--muted);font-family:var(--font-body);
+  font-size:15px;line-height:1.6;pointer-events:none;user-select:none;
+}
+.composer__field.has-text .composer__ph{display:none}
 .composer__input{
-  flex:1;min-width:0;min-height:46px;max-height:132px;padding:11px 13px;
+  flex:1;min-width:0;height:72px;min-height:72px;max-height:72px;padding:11px 13px;
   border:1px solid var(--rule-strong);border-radius:var(--r-xs);background:var(--paper-2);
   color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.6;resize:none;
+  overflow-y:auto;
 }
-.composer__input::placeholder{color:var(--muted)}
 .composer__input:focus{outline:none;border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .composer__send{min-height:46px;flex:none}
 .composer__note{margin:8px 0 0;font-size:10.5px;color:var(--muted);line-height:1.6;max-width:none}
@@ -1031,6 +1039,42 @@ body[data-view="ask"] #app{height:100dvh}
 .chk{display:flex;gap:8px;align-items:flex-start;font-size:11.5px;line-height:1.6;color:var(--ink);cursor:pointer}
 .chk input{margin:2px 0 0;flex:none}
 
+/* ——— 最近删除：删了不立刻消失，留最近 5 份可恢复 ———
+   误删是这类档案最不可逆的损失，恢复入口放在「我的」侧栏，
+   平时折叠着不占地方，有东西时角标变色提示。 */
+.trash{margin-top:14px;border-top:1px solid var(--rule);padding-top:10px}
+.trash__sum{
+  cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;
+  padding:4px 0;font-size:12px;color:var(--ink);
+}
+.trash__sum::-webkit-details-marker{display:none}
+.trash__sum::after{content:'›';margin-left:auto;font-size:15px;color:var(--muted);transition:transform .15s}
+.trash[open] .trash__sum::after{transform:rotate(90deg)}
+.trash__n{
+  font-family:var(--font-mono);font-size:9.5px;line-height:1;
+  min-width:17px;height:17px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--rule-strong);color:var(--muted);
+}
+.trash__n.is-on{border-color:var(--accent);background:var(--accent-wash);color:var(--accent-ink)}
+.trash__body{padding:8px 0 4px}
+.trash__note{margin:0 0 10px;font-size:11.5px;line-height:1.7;color:var(--muted)}
+.trash__list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.trash__item{display:grid;gap:3px;padding:10px 11px;border:1px solid var(--rule-strong);background:var(--paper)}
+.trash__top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.trash__date{font-family:var(--font-mono);font-size:11px;letter-spacing:.03em;color:var(--ink)}
+.trash__del{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.02em;color:var(--muted);flex:none}
+.trash__hosp{font-size:12.5px;line-height:1.5;color:var(--ink);word-break:break-word}
+.trash__meta{font-size:11px;line-height:1.55;color:var(--muted);word-break:break-word}
+.trash__act{
+  margin-top:7px;justify-self:start;
+  font:inherit;font-size:11.5px;line-height:1;padding:7px 12px;cursor:pointer;
+  border:1px solid var(--accent);background:var(--accent-wash);color:var(--accent-ink);
+}
+.trash__act:hover{background:var(--accent);color:var(--paper-2)}
+.trash__act:disabled{opacity:.5;cursor:default}
+.trash__empty{margin:0;font-size:11.5px;line-height:1.7;color:var(--muted)}
+.trash__empty[hidden]{display:none}
+
 .tabbar{display:none}
 
 /* ——— 登录页：手机号登录 / 老账号切换 ——— */
@@ -1174,6 +1218,7 @@ body[data-view="ask"] #app{height:100dvh}
   .tl__cal{min-height:25px;padding:0 7px;font-size:9.5px;right:10px;top:11px}
   .composer__mic{width:42px;height:42px}
   .composer__input{font-size:14px}
+  .composer__ph{font-size:14px}
   .deer-modal{padding:16px}
   .deer-modal__card{padding:18px 16px 14px;border-radius:22px}
   .deer-modal__art{width:68px;height:68px}
@@ -1458,6 +1503,19 @@ body[data-view="ask"] #app{height:100dvh}
           <p class="form__hint" id="exportHint">导出为 JSON：换设备或清浏览器前先存一份。</p>
         </div>
 
+        <!-- 最近删除：误删的档案先落在这里，最近 5 份可一键恢复 -->
+        <details class="trash" id="trashBox">
+          <summary class="trash__sum">
+            <span>恢复删除记录</span>
+            <span class="trash__n" id="trashCount">0</span>
+          </summary>
+          <div class="trash__body">
+            <p class="trash__note">删掉的档案不会立刻消失，最近 5 份留在这里；点一下就回到上面的就诊记录。</p>
+            <ul class="trash__list" id="trashList"></ul>
+            <p class="trash__empty" id="trashEmpty">还没有删除过档案。</p>
+          </div>
+        </details>
+
         <details class="acct" id="acctBox">
           <summary class="acct__sum">账号与安全</summary>
           <div class="acct__body">
@@ -1502,7 +1560,8 @@ body[data-view="ask"] #app{height:100dvh}
                 <li id="acctDataServer">病历与个人资料保存在服务端，换设备登录可恢复。</li>
                 <li>头像与身份证号只存本机浏览器，不上传。</li>
                 <li>语音识别由浏览器语音服务处理，音频可能经其云端；本机不保存音频。</li>
-                <li>服务端档案保留到你删除记录或注销账号为止。</li>
+                <li>删除的记录会在「恢复删除记录」里留最近 5 份，再往后才真正删除。</li>
+                <li>注销账号会删除全部记录，包括这 5 份，且无法恢复。</li>
               </ul>
             </div>
 
@@ -1651,16 +1710,13 @@ body[data-view="ask"] #app{height:100dvh}
         </div>
       </section>
 
-      <section class="panel" id="recordPanel">
+      <!-- 没有草稿时整块不出现：空占位容易让人以为这里已经存了一份 -->
+      <section class="panel" id="recordPanel" hidden>
         <div class="panel__head">
           <span class="meta">本次记录</span>
           <span class="meta" id="recordState">未开始</span>
         </div>
-        <div class="panel__body" id="recordBody">
-          <p class="empty" id="recordEmpty">
-            录完或贴上文字后，这里会出现抽好的字段。你确认保存之前，它不会进档案。
-          </p>
-        </div>
+        <div class="panel__body" id="recordBody"></div>
       </section>
 
       <div class="col__foot" style="padding:14px 16px 0;margin-top:auto;border-top:1px solid var(--rule)">
@@ -1757,8 +1813,10 @@ body[data-view="ask"] #app{height:100dvh}
             </svg>
           </button>
           <label class="sr-only" for="askInput">向小鹿提问</label>
-          <textarea class="composer__input" id="askInput" rows="1"
-                    placeholder="问小鹿：上次看病是什么时候？" autocomplete="off"></textarea>
+          <div class="composer__field">
+            <span class="composer__ph" aria-hidden="true">问小鹿：<br>上次看病是什么时候？</span>
+            <textarea class="composer__input" id="askInput" rows="2" autocomplete="off"></textarea>
+          </div>
           <button class="btn btn--primary composer__send" type="submit">
             发送<span class="btn__key" aria-hidden="true">↵</span>
           </button>
@@ -2017,6 +2075,7 @@ body[data-view="ask"] #app{height:100dvh}
     session: 'lx_session_v1',
     user: function () { return 'lx_user_v1_' + acctKey(); },
     records: function () { return 'lx_records_v1_' + acctKey(); },
+    trash: function () { return 'lx_trash_v1_' + acctKey(); },     // 账号隔离的「最近删除」（只留 5 份）
     theme: function () { return 'lx_theme_v1_' + acctKey(); },   // 账号隔离的主题
     ai: function () { return 'lx_ai_v1_' + acctKey(); },         // 账号隔离的千问配置
     scan: function () { return 'lx_scan_v1_' + acctKey(); },      // 账号隔离的识药记录
@@ -2255,6 +2314,7 @@ body[data-view="ask"] #app{height:100dvh}
     user: '',            // 登录用户名（也是存储分区的键）
     profile: null,       // {name, age, gender, hospital}
     records: [],         // 该用户的就诊记录
+    trash: [],           // 最近删除（最多 5 份）：{id, at, deletedAt, hospital, summary, medCount, raw}
     view: 'home',
     speaking: false,     // 朗读默认关闭：公共场所外放病情是真实风险
     volume: 0.9,
@@ -2873,6 +2933,18 @@ body[data-view="ask"] #app{height:100dvh}
 
     $('#exportBtn').addEventListener('click', exportArchive);
     $('#importBtn').addEventListener('click', function () { $('#importFile').click(); });
+
+    /* 最近删除：只在展开时拉一次最新，平时不占网络 */
+    var trashBox = $('#trashBox');
+    if (trashBox) {
+      trashBox.addEventListener('toggle', function () { if (trashBox.open) loadTrash(); });
+      $('#trashList').addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('[data-restore]') : null;
+        if (!b) return;
+        e.preventDefault();
+        restoreRecord(b.getAttribute('data-restore'));
+      });
+    }
     $('#importFile').addEventListener('change', importArchive);
     $('#printBtn').addEventListener('click', printArchive);
     bindMineFilter();
@@ -3020,6 +3092,7 @@ body[data-view="ask"] #app{height:100dvh}
           syncIdentity();
           renderHome();
           renderWork();
+          loadTrash();
           if (state.view === 'mine') renderMine();
         })
         .catch(function (e) { toast('档案加载失败：' + e.message); });
@@ -3031,6 +3104,7 @@ body[data-view="ask"] #app{height:100dvh}
     if (!state.profile.name) state.profile.name = name;
     if (!existed) write(LS.user(), state.profile);
     state.records = read(LS.records(), []);
+    state.trash = readTrash().map(trashItemFromLocal);
     resumeIntent();
     if (!Array.isArray(state.records)) state.records = [];
 
@@ -4067,6 +4141,7 @@ body[data-view="ask"] #app{height:100dvh}
     if ($('#mineAllergy')) $('#mineAllergy').innerHTML = algMineHtml();
     fillHospFilter();
     updateAcctMode();
+    renderTrash();
     renderRecords();
   }
 
@@ -4225,10 +4300,123 @@ body[data-view="ask"] #app{height:100dvh}
       '</div>';
   }
 
+  /* ————————————————— 最近删除（回收站）—————————————————
+     两条链路共用一套展示形状：
+       服务端 → GET /api/records/deleted（轻量条目，不含转写）
+       本机模式 → localStorage 里整条记录 + deletedAt
+     恢复走「原位复活」，不新建记录：档案挂在同一条 id 上，引用不会断。 */
+  var TRASH_KEEP = 5;
+
+  function trashItemFromServer(x) {
+    return {
+      id: x.id,
+      at: new Date(x.visit_at).getTime(),
+      deletedAt: new Date(x.deleted_at).getTime(),
+      hospital: x.hospital || '',
+      summary: x.summary || '',
+      medCount: x.med_count || 0,
+      raw: null
+    };
+  }
+  function trashItemFromLocal(rec) {
+    return {
+      id: rec.id,
+      at: rec.at || Date.now(),
+      deletedAt: rec.deletedAt || Date.now(),
+      hospital: rec.hospital || '',
+      summary: rec.summary || '',
+      medCount: (rec.meds || []).length,
+      raw: rec
+    };
+  }
+  function readTrash() {
+    var list = read(LS.trash(), []);
+    return (Array.isArray(list) ? list : []).slice(0, TRASH_KEEP);
+  }
+  function writeTrash(list) {
+    write(LS.trash(), (list || []).slice(0, TRASH_KEEP));
+  }
+
+  function loadTrash() {
+    if (!API.on) {
+      state.trash = readTrash().map(trashItemFromLocal);
+      renderTrash();
+      return;
+    }
+    /* 回收站读不到不该挡住主流程，失败就保持现状 */
+    apiFetch('/api/records/deleted')
+      .then(function (list) {
+        state.trash = (list || []).map(trashItemFromServer);
+        renderTrash();
+      })
+      .catch(function () {});
+  }
+
+  function renderTrash() {
+    var list = state.trash || [];
+    var n = $('#trashCount');
+    if (n) {
+      n.textContent = list.length;
+      n.className = 'trash__n' + (list.length ? ' is-on' : '');
+    }
+    var box = $('#trashList');
+    if (!box) return;
+    box.innerHTML = list.map(function (t) {
+      return '<li class="trash__item">' +
+        '<div class="trash__top">' +
+          '<span class="trash__date">' + fmtDate(t.at) + '</span>' +
+          '<span class="trash__del">' + fmtDate(t.deletedAt) + ' 删除</span>' +
+        '</div>' +
+        '<span class="trash__hosp">' + esc(t.hospital || '未写明医院') + '</span>' +
+        '<span class="trash__meta">' + esc(t.summary || '未写明诊断') +
+          (t.medCount ? ' · ' + t.medCount + ' 种药' : '') + '</span>' +
+        '<button class="trash__act" type="button" data-restore="' + esc(t.id) + '">恢复这份档案</button>' +
+      '</li>';
+    }).join('');
+    var empty = $('#trashEmpty');
+    if (empty) empty.hidden = list.length > 0;
+  }
+
+  function restoreRecord(id) {
+    var btn = document.querySelector('[data-restore="' + id + '"]');
+    if (btn) { btn.disabled = true; btn.textContent = '正在恢复…'; }
+
+    function done(rec) {
+      if (rec) {
+        state.records = state.records.filter(function (r) { return r.id !== rec.id; });
+        state.records.push(rec);
+      }
+      state.trash = (state.trash || []).filter(function (t) { return t.id !== id; });
+      /* 先落盘再渲染：渲染函数万一抛错，也不能丢掉刚恢复的这条 */
+      if (!API.on) { writeTrash(readTrash().filter(function (r) { return r.id !== id; })); persistRecords(); }
+      syncIdentity();
+      renderMine();
+      renderHome();
+      renderWork();
+      toast('已恢复到就诊记录。');
+    }
+
+    if (API.on) {
+      apiFetch('/api/records/' + encodeURIComponent(id) + '/restore', { method: 'POST' })
+        .then(function (raw) { done(mapRecord(raw)); })
+        .catch(function (e) {
+          if (btn) { btn.disabled = false; btn.textContent = '恢复这份档案'; }
+          toast('恢复失败：' + e.message);
+          loadTrash();
+        });
+      return;
+    }
+
+    var hit = (state.trash || []).filter(function (t) { return t.id === id; })[0];
+    if (!hit || !hit.raw) { toast('这份记录已经不在可恢复范围内。'); loadTrash(); return; }
+    /* done() 里统一处理：放回列表 → 写回本地存储 → 再渲染 */
+    done(hit.raw);
+  }
+
   function deleteRecord(id) {
     var rec = state.records.filter(function (r) { return r.id === id; })[0];
     if (!rec) return;
-    if (!window.confirm('删除 ' + fmtDate(rec.at) + ' ' + (rec.hospital || '') + ' 这份记录？删除后无法恢复。')) return;
+    if (!window.confirm('删除 ' + fmtDate(rec.at) + ' ' + (rec.hospital || '') + ' 这份记录？\n会先放进「我的 · 恢复删除记录」，最近 5 份都能找回。')) return;
 
     if (API.on) {
       apiFetch('/api/records/' + encodeURIComponent(id), { method: 'DELETE' })
@@ -4238,18 +4426,26 @@ body[data-view="ask"] #app{height:100dvh}
           renderMine();
           renderHome();
           renderWork();
-          toast('已删除，剩余 ' + state.records.length + ' 份。');
+          loadTrash();
+          toast('已删除，可在「我的 · 恢复删除记录」里找回。');
         })
         .catch(function (e) { toast('删除失败：' + e.message); });
       return;
     }
 
     state.records = state.records.filter(function (r) { return r.id !== id; });
+    /* 本机模式：整条记录搬进回收站，保留原始对象，恢复时原样放回 */
+    var kept = readTrash().filter(function (r) { return r.id !== id; });
+    kept.unshift(Object.assign({}, rec, { deletedAt: Date.now() }));
+    writeTrash(kept);
+    state.trash = readTrash().map(trashItemFromLocal);
     persistRecords();
     syncIdentity();
     renderMine();
+    renderHome();
     renderWork();
-    toast('已删除，剩余 ' + state.records.length + ' 份。');
+    renderTrash();
+    toast('已删除，可在「我的 · 恢复删除记录」里找回。');
   }
 
   function persistRecords() {
@@ -4381,11 +4577,16 @@ body[data-view="ask"] #app{height:100dvh}
     var st = $('#recordState');
     var d = state.draft;
 
+    var panel = $('#recordPanel');
+
     if (!d) {
       st.textContent = '未开始';
-      body.innerHTML = '<p class="empty" id="recordEmpty">录完或贴上文字后，这里会出现抽好的字段。你确认保存之前，它不会进档案。</p>';
+      body.innerHTML = '';
+      panel.hidden = true;
       return;
     }
+
+    panel.hidden = false;
 
     st.textContent = d.archived ? '已归档'
       : (d.extractState === 'extracting' ? '整理中'
@@ -4650,10 +4851,12 @@ body[data-view="ask"] #app{height:100dvh}
     }
   }
 
+  /* 输入框固定两行高：空着显示居中提示，超过两行在框内滚动 */
   function autoGrow() {
     var el = $('#askInput');
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 132) + 'px';
+    if (!el) return;
+    var box = el.parentNode;
+    if (box && box.classList) box.classList.toggle('has-text', el.value.length > 0);
   }
 
   /* 能录音的条件：浏览器实时识别，或能录音 + 服务端有转写 */

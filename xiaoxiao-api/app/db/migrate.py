@@ -29,6 +29,8 @@ _COLUMNS = (
     ("records", "self_check", "JSON"),
     ("records", "confidence", "REAL DEFAULT 0"),
     ("records", "uncertain", "JSON"),
+    # v3：软删除（回收站），只保留最近 5 份
+    ("records", "deleted_at", "DATETIME"),
 )
 
 # 手机号摘要的唯一索引，与 create_all 生成的名字保持一致
