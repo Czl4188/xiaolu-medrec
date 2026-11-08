@@ -2739,6 +2739,8 @@ body[data-view="ask"] #app{height:100dvh}
         try {
           localStorage.removeItem(LS.user());
           localStorage.removeItem(LS.records());
+          /* 回收站存的是完整病历，注销后不能留在本机 */
+          localStorage.removeItem(LS.trash());
           localStorage.removeItem(LS.theme());
           localStorage.removeItem(LS.ai());
           localStorage.removeItem(LS.scan());
