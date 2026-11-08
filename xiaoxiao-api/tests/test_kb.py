@@ -53,3 +53,15 @@ def test_unlisted_word_not_invented():
     data = extract("医生说吃点维生素就行，没开别的药。")
     names = [m["name"] for m in data["meds"]]
     assert "维生素" not in names, "泛称不该当成品名入库"
+
+
+def test_lab_term_is_not_a_drug():
+    data = extract("查了尿素氮偏高，葡萄糖-6-磷酸脱氢酶也查了，医生说都正常。")
+    names = [m["name"] for m in data["meds"]]
+    assert names == [], f"检验名目被当成药：{names}"
+
+
+def test_old_name_resolves_to_aspirin():
+    data = extract("开了乙酰水杨酸片100mg每天一次。")
+    names = [m["name"] for m in data["meds"]]
+    assert names == ["阿司匹林"], f"旧称没换成通用名：{names}"

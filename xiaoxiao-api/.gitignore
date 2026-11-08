@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 data/
+# 药品知识库是公开政府数据，随仓库走（只放行这个目录）
+!app/data/
+!app/data/*.csv
 .env
 .pytest_cache/
 dist/

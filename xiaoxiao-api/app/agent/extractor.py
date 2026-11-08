@@ -173,9 +173,12 @@ def _extract_meds(sentences: list[str]) -> tuple[list[dict], list[str]]:
             continue
         for idx, hit in enumerate(hits):
             raw_name = hit.group(1)
-            after = sentence[hit.end():hit.end() + 4]
+            after = sentence[hit.end():hit.end() + 6]
             if after.startswith(("过敏", "不耐受")):
                 continue  # 「青霉素过敏」里的青霉素是过敏原，不是服用的药
+            # 检验/生化名目里含药名片段，但不是药：尿素氮、葡萄糖-6-磷酸脱氢酶
+            if after.startswith(("氮", "酶")) or after.startswith(("-6-", "－6－", "-6－")):
+                continue
             name = canonical(hit)
             if not name or len(name) < 2 or name in seen or NOT_DRUG.match(name):
                 continue
