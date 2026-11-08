@@ -79,3 +79,24 @@ def test_bie_ren_is_not_a_stop_phrase():
         data = extract(text)
         assert [m["name"] for m in data["meds"]] == ["阿莫西林"], text
         assert not (data.get("discontinued") or []), text
+
+
+def test_merge_drops_discontinued_from_meds():
+    # 模型只抽到药、规则认出停用时，合并后不能同一味药两处都在
+    from app.api.routes_records import _merge_engine
+
+    rule = {"meds": [], "discontinued": ["二甲双胍"], "visit_at": None}
+    eng = {"meds": [{"name": "达美康", "dose": "30毫克"},
+                    {"name": "二甲双胍", "dose": ""}]}
+    out = _merge_engine(rule, eng)
+    assert [m["name"] for m in out["meds"]] == ["达美康"]
+    assert "二甲双胍" in out["discontinued"]
+
+
+def test_merge_drop_respects_dosage_suffix():
+    # 「二甲双胍片」在停药名单写成「二甲双胍」时也要摘掉
+    from app.api.routes_records import _merge_engine
+
+    rule = {"meds": [], "discontinued": ["二甲双胍"], "visit_at": None}
+    eng = {"meds": [{"name": "二甲双胍片", "dose": ""}]}
+    assert _merge_engine(rule, eng)["meds"] == []
