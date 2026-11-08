@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import UTC, datetime
 
 from app.agent import engine
+from app.agent import kb as drug_kb
 from app.agent.extractor import extract
 from app.agent.refine import refine_extract
 from app.api.deps import current_user, rate_limit
@@ -174,6 +175,14 @@ def _merge_engine(rule: dict, eng: dict) -> dict:
         out["meds"] = rule.get("meds") or []
     else:
         out["meds"] = eng["meds"]
+
+    # 停用名单常常只有一侧给出：模型只抽到药、规则认出「先别吃了」时，
+    # 同一味药会同时出现在用药和停用药里（线上实测「二甲双胍先别吃了」就是）。
+    # 合并后统一摘掉，以停用为准。
+    stop = {drug_kb.normalize(n) for n in (out.get("discontinued") or []) if str(n).strip()}
+    if stop:
+        out["meds"] = [m for m in (out.get("meds") or [])
+                       if drug_kb.normalize(m.get("name", "")) not in stop]
 
     # 过敏：模型明确表态（阳性/否认）时以模型为准，完全没提才用规则结果
     if eng.get("allergens"):
